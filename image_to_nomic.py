@@ -6,20 +6,27 @@ This script processes a directory of image files and converts them into Nomic At
 embeddings in JSONL format, suitable for importing into Nomic Atlas.
 
 Requirements:
-    pip install nomic pillow typer tqdm torch
+    pip install "nomic[local]" pillow typer tqdm torch
 """
 
 import os
 import json
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+from enum import Enum
 
 import torch
 import typer
 from PIL import Image
 from tqdm import tqdm
 from nomic import embed
+import numpy as np
 from typing_extensions import Annotated
+
+class NomicMode(str, Enum):
+    """Nomic embedding mode options"""
+    LOCAL = "local"
+    API = "api"
 
 app = typer.Typer(help="Convert image files to Nomic Atlas embeddings in JSONL format.")
 
@@ -62,18 +69,19 @@ def process_images_batch(
     batch_size: int, 
     model_name: str,
     device: Optional[str] = None,
-    include_metadata: bool = False
+    include_metadata: bool = False,
+    nomic_mode: NomicMode = NomicMode.LOCAL,
+    dry_run: bool = False
 ) -> List[Dict[str, Any]]:
     """Process images in batches and generate embeddings."""
     # Determine device
-    if device is None:
+    if device is None and nomic_mode == NomicMode.LOCAL:
         device = "cuda" if torch.cuda.is_available() else "cpu"
     
-    print(f"Using device: {device}")
-    
-    # Load model
-    print(f"Loading embedding model: {model_name}")
-    embedder = embed.ImageEmbedder(model_name=model_name, device=device)
+    if nomic_mode == NomicMode.LOCAL:
+        print(f"Using device: {device} with local embedding")
+    elif nomic_mode == NomicMode.API:
+        print("Using Nomic API for embedding")
     
     results = []
     total_batches = (len(image_files) + batch_size - 1) // batch_size
@@ -83,28 +91,37 @@ def process_images_batch(
         end_idx = min((batch_idx + 1) * batch_size, len(image_files))
         batch_files = image_files[start_idx:end_idx]
         
-        # Load images
-        loaded_images = []
-        valid_files = []
-        
-        for img_path in batch_files:
-            try:
-                img = Image.open(img_path).convert("RGB")
-                loaded_images.append(img)
-                valid_files.append(img_path)
-            except Exception as e:
-                print(f"Error loading {img_path}: {e}")
-                continue
-        
-        if not loaded_images:
+        # In dry run mode, just create dummy embeddings
+        if dry_run:
+            print(f"Dry run: Creating dummy embeddings for batch {batch_idx+1}/{total_batches}")
+            for file_path in batch_files:
+                record = {
+                    "id": str(Path(file_path).stem),
+                    "embedding": [0.0] * 512  # Common embedding size
+                }
+                
+                if include_metadata:
+                    record["metadata"] = get_file_metadata(file_path)
+                
+                results.append(record)
             continue
-        
-        # Generate embeddings
+            
+        # Generate embeddings using nomic.embed.image
         try:
-            embeddings = embedder.embed(loaded_images).tolist()
+            # Configure kwargs based on mode
+            kwargs = {"model": model_name}
+            if nomic_mode == NomicMode.LOCAL:
+                kwargs["device"] = device
+            
+            output = embed.image(
+                images=batch_files,
+                **kwargs
+            )
+            
+            embeddings = np.array(output['embeddings']).tolist()
             
             # Create records
-            for idx, (file_path, embedding) in enumerate(zip(valid_files, embeddings)):
+            for idx, (file_path, embedding) in enumerate(zip(batch_files, embeddings)):
                 record = {
                     "id": str(Path(file_path).stem),
                     "embedding": embedding
@@ -115,12 +132,8 @@ def process_images_batch(
                 
                 results.append(record)
                 
-            # Close images
-            for img in loaded_images:
-                img.close()
-                
         except Exception as e:
-            print(f"Error generating embeddings for batch {batch_idx}: {e}")
+            print(f"Error generating embeddings for batch {batch_idx+1}/{total_batches}: {str(e)}")
     
     return results
 
@@ -139,9 +152,11 @@ def main(
     extensions: Annotated[str, typer.Option("--extensions", "-e", help="Comma-separated list of image file extensions to process")] = ".jpg,.jpeg,.png,.bmp,.gif",
     batch_size: Annotated[int, typer.Option("--batch-size", "-b", help="Batch size for embedding generation")] = 16,
     max_files: Annotated[Optional[int], typer.Option("--max-files", "-m", help="Maximum number of files to process")] = None,
-    model: Annotated[str, typer.Option(help="Nomic embedding model to use")] = "nomic-ai/nomic-embed-vision-v1.5",
+    model: Annotated[str, typer.Option(help="Nomic embedding model to use")] = "nomic-embed-vision-v1.5",
     device: Annotated[Optional[str], typer.Option(help="Device to use (e.g., 'cuda', 'cpu')")] = None,
     metadata: Annotated[bool, typer.Option(help="Include file metadata in the output")] = False,
+    nomic_mode: Annotated[NomicMode, typer.Option("--nomic", help="Nomic mode: 'local' or 'api'")] = NomicMode.LOCAL,
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Run without calling Nomic API")] = False,
 ) -> None:
     """
     Convert image files to Nomic Atlas embeddings in JSONL format.
@@ -167,7 +182,9 @@ def main(
         batch_size, 
         model,
         device,
-        metadata
+        metadata,
+        nomic_mode,
+        dry_run
     )
     
     # Save results
