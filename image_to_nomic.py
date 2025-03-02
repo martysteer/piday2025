@@ -6,73 +6,23 @@ This script processes a directory of image files and converts them into Nomic At
 embeddings in JSONL format, suitable for importing into Nomic Atlas.
 
 Requirements:
-    pip install nomic pillow argparse tqdm
+    pip install nomic pillow typer tqdm torch
 """
 
 import os
 import json
-import argparse
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 import torch
+import typer
 from PIL import Image
 from tqdm import tqdm
 from nomic import atlas
+from typing_extensions import Annotated
 
-def setup_args() -> argparse.Namespace:
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Convert image files to Nomic Atlas embeddings in JSONL format."
-    )
-    parser.add_argument(
-        "--input_dir", "-i", 
-        type=str, 
-        required=True,
-        help="Directory containing image files"
-    )
-    parser.add_argument(
-        "--output_file", "-o", 
-        type=str, 
-        default="image_embeddings.jsonl",
-        help="Output JSONL file path (default: image_embeddings.jsonl)"
-    )
-    parser.add_argument(
-        "--extensions", "-e", 
-        type=str, 
-        default=".jpg,.jpeg,.png,.bmp,.gif",
-        help="Comma-separated list of image file extensions to process (default: .jpg,.jpeg,.png,.bmp,.gif)"
-    )
-    parser.add_argument(
-        "--batch_size", "-b", 
-        type=int, 
-        default=16,
-        help="Batch size for embedding generation (default: 16)"
-    )
-    parser.add_argument(
-        "--max_files", "-m", 
-        type=int, 
-        default=None,
-        help="Maximum number of files to process (default: process all)"
-    )
-    parser.add_argument(
-        "--model", 
-        type=str, 
-        default="nomic-ai/nomic-embed-vision-v1.5",
-        help="Nomic embedding model to use (default: nomic-ai/nomic-embed-vision-v1.5)"
-    )
-    parser.add_argument(
-        "--device", 
-        type=str, 
-        default=None,
-        help="Device to use (e.g., 'cuda', 'cpu', default: auto-detect)"
-    )
-    parser.add_argument(
-        "--metadata", 
-        action="store_true",
-        help="Include file metadata in the output"
-    )
-    return parser.parse_args()
+app = typer.Typer(help="Convert image files to Nomic Atlas embeddings in JSONL format.")
+
 
 def find_image_files(input_dir: str, extensions: List[str], max_files: Optional[int] = None) -> List[str]:
     """Find all image files with the specified extensions in the input directory."""
@@ -91,6 +41,7 @@ def find_image_files(input_dir: str, extensions: List[str], max_files: Optional[
     
     return image_files
 
+
 def get_file_metadata(filepath: str) -> Dict[str, Any]:
     """Extract basic metadata from the file."""
     stats = os.stat(filepath)
@@ -104,6 +55,7 @@ def get_file_metadata(filepath: str) -> Dict[str, Any]:
         "created": stats.st_ctime,
         "modified": stats.st_mtime,
     }
+
 
 def process_images_batch(
     image_files: List[str], 
@@ -172,22 +124,37 @@ def process_images_batch(
     
     return results
 
+
 def save_jsonl(records: List[Dict[str, Any]], output_file: str) -> None:
     """Save records to JSONL format."""
     with open(output_file, 'w') as f:
         for record in records:
             f.write(json.dumps(record) + '\n')
 
-def main() -> None:
-    """Main function."""
-    args = setup_args()
+
+@app.command()
+def main(
+    input_dir: Annotated[str, typer.Option("--input-dir", "-i", help="Directory containing image files")],
+    output_file: Annotated[str, typer.Option("--output-file", "-o", help="Output JSONL file path")] = "image_embeddings.jsonl",
+    extensions: Annotated[str, typer.Option("--extensions", "-e", help="Comma-separated list of image file extensions to process")] = ".jpg,.jpeg,.png,.bmp,.gif",
+    batch_size: Annotated[int, typer.Option("--batch-size", "-b", help="Batch size for embedding generation")] = 16,
+    max_files: Annotated[Optional[int], typer.Option("--max-files", "-m", help="Maximum number of files to process")] = None,
+    model: Annotated[str, typer.Option(help="Nomic embedding model to use")] = "nomic-ai/nomic-embed-vision-v1.5",
+    device: Annotated[Optional[str], typer.Option(help="Device to use (e.g., 'cuda', 'cpu')")] = None,
+    metadata: Annotated[bool, typer.Option(help="Include file metadata in the output")] = False,
+) -> None:
+    """
+    Convert image files to Nomic Atlas embeddings in JSONL format.
     
+    This tool processes all images in the specified directory and creates embeddings
+    using the Nomic Atlas API, saving the results in JSONL format.
+    """
     # Process extensions
-    extensions = [ext.strip() for ext in args.extensions.split(",")]
+    extension_list = [ext.strip() for ext in extensions.split(",")]
     
     # Find image files
-    print(f"Searching for images in {args.input_dir}")
-    image_files = find_image_files(args.input_dir, extensions, args.max_files)
+    print(f"Searching for images in {input_dir}")
+    image_files = find_image_files(input_dir, extension_list, max_files)
     print(f"Found {len(image_files)} image files")
     
     if not image_files:
@@ -197,15 +164,16 @@ def main() -> None:
     # Process images and generate embeddings
     results = process_images_batch(
         image_files, 
-        args.batch_size, 
-        args.model,
-        args.device,
-        args.metadata
+        batch_size, 
+        model,
+        device,
+        metadata
     )
     
     # Save results
-    save_jsonl(results, args.output_file)
-    print(f"Successfully saved {len(results)} embeddings to {args.output_file}")
+    save_jsonl(results, output_file)
+    print(f"Successfully saved {len(results)} embeddings to {output_file}")
+
 
 if __name__ == "__main__":
-    main()
+    app()
