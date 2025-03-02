@@ -33,6 +33,8 @@ Trust some certifications so package installs work.
 pip config set global.trusted-host "pypi.org files.pythonhosted.org pypi.python.org"
 pip install pipenv
 pip install -r requirements.txt
+nomic login nk-lQO-NJQXEPXmXyNc1p97qloFUhtBHSI-j9SwFOUQZC0
+
 ```
 
 #### Step 4: Set up the project with pipenv

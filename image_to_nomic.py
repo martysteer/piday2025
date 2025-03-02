@@ -18,7 +18,7 @@ import torch
 import typer
 from PIL import Image
 from tqdm import tqdm
-from nomic import atlas
+from nomic import embed
 from typing_extensions import Annotated
 
 app = typer.Typer(help="Convert image files to Nomic Atlas embeddings in JSONL format.")
@@ -73,7 +73,7 @@ def process_images_batch(
     
     # Load model
     print(f"Loading embedding model: {model_name}")
-    embedder = atlas.EmbeddingModel(model_name=model_name, device=device)
+    embedder = embed.ImageEmbedder(model_name=model_name, device=device)
     
     results = []
     total_batches = (len(image_files) + batch_size - 1) // batch_size

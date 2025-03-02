@@ -1,4 +1,4 @@
-nomic>=2.0.0
+nomic[local]>=2.0.0
 pillow>=9.0.0
 argparse>=1.4.0
 tqdm>=4.62.0
