@@ -156,7 +156,7 @@ def main():
     parser.add_argument("--image-dir", "-i", default="data/images", help="Directory containing image files")
     parser.add_argument("--track-file", "-t", default="data/atlas_tracking.json", help="File to track uploaded images")
     parser.add_argument("--map-name", "-n", default="PiDay2025", help="Name for the Atlas map")
-    parser.add_argument("--batch-size", "-b", type=int, default=10, help="Number of images to upload in each batch")
+    parser.add_argument("--batch-size", "-b", type=int, default=20, help="Number of images to upload in each batch")
     parser.add_argument("--new-map", action="store_true", help="Force creation of a new map")
     parser.add_argument("--verbose", "-v", action="store_true", help="Print verbose output")
     parser.add_argument("--dataset-id", "-d", help="Specify dataset ID directly (username/dataset_name)")
