@@ -61,7 +61,7 @@ def save_atlas_info(embeddings_dir: str, map_id: str, map_name: str) -> None:
         print(f"Error saving Atlas info file: {str(e)}")
 
 def load_embeddings_from_file(filepath: str) -> tuple:
-    """Load embeddings and data from a JSONL file."""
+    """Load embeddings and data from a JSONL file with flat structure."""
     embeddings = []
     data = []
     
@@ -69,25 +69,16 @@ def load_embeddings_from_file(filepath: str) -> tuple:
         with open(filepath, 'r') as f:
             for line in f:
                 record = json.loads(line)
-                embeddings.append(record['embedding'])
                 
-                # Extract metadata for data field
-                metadata = record.get('metadata', {})
-                item_data = {
-                    'id': record['id'],
-                }
-                
-                # Add metadata if available
-                if metadata:
-                    item_data.update({
-                        'filename': metadata.get('filename', ''),
-                        'filepath': metadata.get('filepath', ''),
-                        'created': metadata.get('created', ''),
-                        'size_bytes': metadata.get('size_bytes', 0),
-                        'extension': metadata.get('extension', ''),
-                    })
-                
-                data.append(item_data)
+                # Extract the embedding
+                if 'embedding' in record:
+                    embeddings.append(record['embedding'])
+                    
+                    # Create a data record with all fields except the embedding
+                    item_data = {k: v for k, v in record.items() if k != 'embedding'}
+                    data.append(item_data)
+                else:
+                    print(f"Warning: Record missing embedding field in {filepath}")
         
         return embeddings, data
     

@@ -59,25 +59,34 @@ def get_processed_files(output_dir: str) -> Set[str]:
             with open(jsonl_file, 'r') as f:
                 for line in f:
                     record = json.loads(line)
-                    if 'metadata' in record and 'filepath' in record['metadata']:
-                        processed.add(record['metadata']['filepath'])
+                    if 'filepath' in record:
+                        processed.add(record['filepath'])
         except Exception as e:
             print(f"Error reading {jsonl_file}: {e}")
     
     return processed
 
 def get_file_metadata(filepath: str) -> Dict[str, Any]:
-    """Extract basic metadata from the file."""
+    """Extract metadata from the file, including the subdirectory as label."""
     stats = os.stat(filepath)
-    file = Path(filepath)
+    file_path = Path(filepath)
     
+    # Get the parent directory name as the label
+    # This will be the immediate parent directory of the file
+    label = file_path.parent.name
+    
+    # If the parent directory is the input directory root, use "unlabeled"
+    if label == "images" or label == "":
+        label = "unlabeled"
+        
     return {
-        "filename": file.name,
-        "filepath": str(file),
-        "extension": file.suffix.lower(),
+        "filename": file_path.name,
+        "filepath": str(file_path),
+        "extension": file_path.suffix.lower(),
         "size_bytes": stats.st_size,
         "created": stats.st_ctime,
         "modified": stats.st_mtime,
+        "label": label
     }
 
 def process_images(
@@ -107,16 +116,14 @@ def process_images(
         
         try:
             # Configure kwargs based on mode
-            kwargs = {"model": model_name
-                    #   "task_type": "search_document"
-                     }
+            kwargs = {"model": model_name}
             
             if use_api:
                 # API mode
                 output = embed.image(images=batch_files, **kwargs)
             else:
                 # Local mode
-                kwargs["inference_mode"] = 'local'
+                # kwargs["inference_mode"] = 'local'
                 output = embed.image(images=batch_files, **kwargs)
             
             embeddings = np.array(output['embeddings']).tolist()
@@ -124,13 +131,18 @@ def process_images(
             # Create records
             records = []
             for idx, (file_path, embedding) in enumerate(zip(batch_files, embeddings)):
+                # Get metadata
+                metadata = get_file_metadata(file_path) if include_metadata else {}
+                
+                # Create record with flat structure (no nested metadata)
                 record = {
                     "id": str(Path(file_path).stem),
                     "embedding": embedding
                 }
                 
+                # Add metadata fields as flat keys
                 if include_metadata:
-                    record["metadata"] = get_file_metadata(file_path)
+                    record.update(metadata)
                 
                 records.append(record)
             
