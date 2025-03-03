@@ -8,7 +8,7 @@ set -e
 OUTPUT_FILE="image_embeddings.jsonl"
 EXTENSIONS=".jpg,.jpeg,.png,.bmp,.gif"
 MODEL="nomic-embed-vision-v1.5"
-API_KEY="nk-lQO-NJQXEPXmXyNc1p97qloFUhtBHSI-j9SwFOUQZC0"
+API_KEY="nk-XXXXX"
 INCLUDE_METADATA=true
 
 # Function to display usage

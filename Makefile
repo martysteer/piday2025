@@ -1,7 +1,7 @@
 # Makefile for Nomic Atlas Image Embeddings
 
 # Configuration
-API_KEY := nk-lQO-NJQXEPXmXyNc1p97qloFUhtBHSI-j9SwFOUQZC0
+API_KEY := nk-XXXX
 MODEL := nomic-embed-vision-v1.5
 IMAGE_DIR := images
 OUTPUT_DIR := build
