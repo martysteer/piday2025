@@ -185,7 +185,10 @@ def main():
         return
     
     # Get already uploaded files and map info
-    uploaded_files, existing_map_id, existing_map_name = get_uploaded_files(args.track_file)
+    uploaded_files, existing_map_id, existing_map_name, existing_dataset_id = get_uploaded_files(args.track_file)
+    
+    # Use provided dataset ID if specified
+    dataset_id = args.dataset_id or existing_dataset_id
     
     # Use existing map name if available and not specified
     if existing_map_name and args.map_name == "PiDay2025":
@@ -206,8 +209,10 @@ def main():
         map_id = existing_map_id
         if map_id:
             print(f"Using existing map ID: {map_id}")
-        else:
-            print("No existing map ID found. Will create a new map.")
+        if dataset_id:
+            print(f"Using existing dataset ID: {dataset_id}")
+        if not map_id and not dataset_id:
+            print("No existing map/dataset IDs found. Will create a new map.")
     
     # Prepare metadata for all images
     image_paths, metadata = prepare_metadata(new_image_files)
@@ -254,17 +259,43 @@ def main():
                 )
                 map_id = atlas_map.id
                 
-                # Extract dataset_id from the output
-                # Dataset ID format is typically "username/dataset_name"
-                # We can extract it from the logs or directly from the atlas_map object
-                dataset_id = atlas_map.project_id
+                # Extract dataset_id from the output logs
+                # Look for lines like "Created map `PiDay2025` in dataset `martysteer/piday2025`"
+                # This will be logged in the Nomic library
+                
+                # Store the organization name and dataset name separately from logs if possible
+                org_name = None
+                dataset_name = None
+                
+                # Try to get dataset ID from the map object
+                if hasattr(atlas_map, 'project_id'):
+                    dataset_id = atlas_map.project_id
+                elif hasattr(atlas_map, 'dataset_id'):
+                    dataset_id = atlas_map.dataset_id
+                
+                # If we still don't have it, construct it from the map name
                 if not dataset_id:
-                    # Try to parse from the URL
-                    if hasattr(atlas_map, 'url'):
-                        parts = atlas_map.url.split('/')
-                        if len(parts) >= 3:
-                            # Extract "username/dataset_name" from URL
-                            dataset_id = f"{parts[-2]}/{parts[-1]}"
+                    # Try to get it from environment variables or other sources
+                    import getpass
+                    username = os.getenv("NOMIC_USERNAME")
+                    if not username:
+                        try:
+                            # This will try to read from ~/.nomic/credentials.json
+                            from nomic.settings import get_settings
+                            settings = get_settings()
+                            if hasattr(settings, 'userinfo') and settings.userinfo:
+                                username = settings.userinfo.get('username')
+                        except:
+                            pass
+                    
+                    # If we still don't have a username, use current system username as fallback
+                    if not username:
+                        username = getpass.getuser()
+                    
+                    # Create a safe dataset name from the map name
+                    safe_name = args.map_name.lower().replace(' ', '_').replace('-', '_')
+                    dataset_id = f"{username}/{safe_name}"
+                    print(f"Constructed dataset ID: {dataset_id}")
                 
                 args.new_map = False  # Set to False so we update this map for subsequent batches
                 print(f"Created new Atlas map with ID: {map_id}")
@@ -283,33 +314,8 @@ def main():
                     )
                     print(f"Added batch to Atlas dataset {dataset_id}")
                 else:
-                    # Fallback to try using the map name
-                    username = os.getenv("NOMIC_USERNAME", "")  # Try to get username from env
-                    if not username:
-                        # Try to extract from existing dataset ID if available
-                        if existing_dataset_id and '/' in existing_dataset_id:
-                            username = existing_dataset_id.split('/')[0]
-                    
-                    # If we found a username, use it to construct dataset ID
-                    if username:
-                        # Convert map name to lowercase and replace spaces with underscores
-                        safe_name = args.map_name.lower().replace(' ', '_').replace('-', '_')
-                        dataset_id = f"{username}/{safe_name}"
-                        print(f"Constructed dataset ID: {dataset_id}")
-                        
-                        try:
-                            atlas_dataset = atlas.AtlasDataset(dataset_id)
-                            atlas_dataset.add_data(
-                                blobs=batch_images,
-                                data=batch_metadata
-                            )
-                            print(f"Added batch to Atlas dataset {dataset_id}")
-                        except Exception as e:
-                            print(f"Error with constructed dataset ID: {str(e)}")
-                            raise
-                    else:
-                        print("Cannot determine dataset ID. Please specify with --dataset-id")
-                        raise ValueError("Missing dataset ID for updating existing map")
+                    print("Cannot determine dataset ID. Please specify with --dataset-id")
+                    raise ValueError("Missing dataset ID for updating existing map")
             
             # Mark files as uploaded
             uploaded_files.update(batch_images)
@@ -324,8 +330,11 @@ def main():
             break
     
     if map_id:
-        print(f"Successfully uploaded images to Atlas map: {map_id}")
+        print(f"\nSuccessfully uploaded images to Atlas map: {map_id}")
         print(f"You can view the map at: https://atlas.nomic.ai/map/{map_id}")
+        if dataset_id:
+            print(f"Dataset ID: {dataset_id}")
+            print(f"Dataset URL: https://atlas.nomic.ai/data/{dataset_id}")
 
 if __name__ == "__main__":
     main()
