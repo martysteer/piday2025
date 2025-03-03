@@ -159,7 +159,7 @@ def main():
     parser.add_argument("--batch-size", "-b", type=int, default=20, help="Number of images to upload in each batch")
     parser.add_argument("--new-map", action="store_true", help="Force creation of a new map")
     parser.add_argument("--verbose", "-v", action="store_true", help="Print verbose output")
-    parser.add_argument("--dataset-id", "-d", help="Specify dataset ID directly (username/dataset_name)")
+    parser.add_argument("--dataset-id", "-d", default="martysteer/piday2025", help="Specify dataset ID directly (username/dataset_name)")
     args = parser.parse_args()
     
     print("\n=== PiDay2025 Direct Image Upload ===")
@@ -187,8 +187,13 @@ def main():
     # Get already uploaded files and map info
     uploaded_files, existing_map_id, existing_map_name, existing_dataset_id = get_uploaded_files(args.track_file)
     
-    # Use provided dataset ID if specified
-    dataset_id = args.dataset_id or existing_dataset_id
+    # Use dataset ID with simple priority: command line arg > tracking file > default
+    dataset_id = args.dataset_id
+    if dataset_id != "martysteer/piday2025" or existing_dataset_id is None:
+        print(f"Using dataset ID from command line: {dataset_id}")
+    elif existing_dataset_id:
+        dataset_id = existing_dataset_id
+        print(f"Using dataset ID from tracking file: {dataset_id}")
     
     # Use existing map name if available and not specified
     if existing_map_name and args.map_name == "PiDay2025":
@@ -277,28 +282,10 @@ def main():
                 elif hasattr(atlas_map, 'dataset_id'):
                     dataset_id = atlas_map.dataset_id
                 
-                # If we still don't have it, construct it from the map name
+                # Use the default dataset ID if we don't have one
                 if not dataset_id:
-                    import getpass
-                    username = os.getenv("NOMIC_USERNAME")
-                    if not username:
-                        try:
-                            # This will try to read from ~/.nomic/credentials.json
-                            from nomic.settings import get_settings
-                            settings = get_settings()
-                            if hasattr(settings, 'userinfo') and settings.userinfo:
-                                username = settings.userinfo.get('username')
-                        except:
-                            pass
-                    
-                    # If we still don't have a username, use current system username as fallback
-                    if not username:
-                        username = getpass.getuser()
-                    
-                    # Create a safe dataset name from the map name
-                    safe_name = args.map_name.lower().replace(' ', '_').replace('-', '_')
-                    dataset_id = f"{username}/{safe_name}"
-                    print(f"Constructed dataset ID: {dataset_id}")
+                    dataset_id = "martysteer/piday2025"
+                    print(f"Using default dataset ID: {dataset_id}")
                 
                 # Initialize dataset for future batches
                 from nomic import AtlasDataset
