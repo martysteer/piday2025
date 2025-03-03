@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 import typer
+import numpy as np
 from nomic import atlas
 
 # Define the app
@@ -140,13 +141,17 @@ def main(
     
     print(f"Uploading {total_embeddings} embeddings to Atlas...")
     
+    # Convert embeddings to numpy array
+    np_embeddings = np.array(all_embeddings)
+    print(f"Embeddings array shape: {np_embeddings.shape}")
+    
     try:
         # Create or update Atlas map
         if new_map or map_id is None:
             # Create new map
             print(f"Creating new Atlas map: {map_name}")
             result = atlas.map_data(
-                embeddings=all_embeddings,
+                embeddings=np_embeddings,
                 data=all_data,
                 identifier=map_name,
                 description=map_description
@@ -157,7 +162,7 @@ def main(
             # Update existing map
             print(f"Updating existing Atlas map: {map_id}")
             result = atlas.map_data(
-                embeddings=all_embeddings,
+                embeddings=np_embeddings,
                 data=all_data,
                 identifier=map_id,
                 rebuild=True  # Rebuild to ensure consistent visualization
