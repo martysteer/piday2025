@@ -218,7 +218,6 @@ def main():
     image_paths, metadata = prepare_metadata(new_image_files)
     
     # Process in batches
-    atlas_map = None
     batch_size = args.batch_size
     
     print(f"Uploading {len(image_paths)} images in batches of {batch_size}")
@@ -236,6 +235,19 @@ def main():
     for label, count in labels.items():
         print(f"  {label}: {count} images")
     
+    # Initialize dataset object if we already have a dataset ID
+    atlas_dataset = None
+    if dataset_id and not args.new_map:
+        try:
+            # Import AtlasDataset directly
+            from nomic import AtlasDataset
+            atlas_dataset = AtlasDataset(dataset_id)
+            print(f"Connected to existing dataset: {dataset_id}")
+        except Exception as e:
+            print(f"Error connecting to dataset {dataset_id}: {e}")
+            print("Will attempt to create a new dataset instead.")
+            dataset_id = None
+            
     # Process batches    
     for i in range(0, len(image_paths), batch_size):
         batch_end = min(i + batch_size, len(image_paths))
@@ -248,7 +260,7 @@ def main():
             print(f"  {j+1}. {img}")
         
         try:
-            if map_id is None or args.new_map:
+            if (map_id is None or args.new_map) and atlas_dataset is None:
                 # Create new map with first batch
                 print(f"Creating new Atlas map: {args.map_name}")
                 atlas_map = atlas.map_data(
@@ -259,14 +271,6 @@ def main():
                 )
                 map_id = atlas_map.id
                 
-                # Extract dataset_id from the output logs
-                # Look for lines like "Created map `PiDay2025` in dataset `martysteer/piday2025`"
-                # This will be logged in the Nomic library
-                
-                # Store the organization name and dataset name separately from logs if possible
-                org_name = None
-                dataset_name = None
-                
                 # Try to get dataset ID from the map object
                 if hasattr(atlas_map, 'project_id'):
                     dataset_id = atlas_map.project_id
@@ -275,7 +279,6 @@ def main():
                 
                 # If we still don't have it, construct it from the map name
                 if not dataset_id:
-                    # Try to get it from environment variables or other sources
                     import getpass
                     username = os.getenv("NOMIC_USERNAME")
                     if not username:
@@ -297,25 +300,26 @@ def main():
                     dataset_id = f"{username}/{safe_name}"
                     print(f"Constructed dataset ID: {dataset_id}")
                 
+                # Initialize dataset for future batches
+                from nomic import AtlasDataset
+                atlas_dataset = AtlasDataset(dataset_id)
+                
                 args.new_map = False  # Set to False so we update this map for subsequent batches
                 print(f"Created new Atlas map with ID: {map_id}")
-                if dataset_id:
-                    print(f"Dataset ID: {dataset_id}")
+                print(f"Dataset ID: {dataset_id}")
             else:
-                # Update existing map
-                print(f"Adding to existing Atlas map: {map_id}")
-                if dataset_id:
-                    print(f"Using dataset ID: {dataset_id}")
-                    # Use dataset_id to add data
-                    atlas_dataset = atlas.AtlasDataset(dataset_id)
-                    atlas_dataset.add_data(
-                        blobs=batch_images,
-                        data=batch_metadata
-                    )
-                    print(f"Added batch to Atlas dataset {dataset_id}")
-                else:
-                    print("Cannot determine dataset ID. Please specify with --dataset-id")
-                    raise ValueError("Missing dataset ID for updating existing map")
+                # Add to existing dataset
+                if atlas_dataset is None:
+                    # If we have dataset_id but no atlas_dataset object yet
+                    from nomic import AtlasDataset
+                    atlas_dataset = AtlasDataset(dataset_id)
+                
+                print(f"Adding batch to existing Atlas dataset: {dataset_id}")
+                atlas_dataset.add_data(
+                    blobs=batch_images,
+                    data=batch_metadata
+                )
+                print(f"Successfully added batch to dataset")
             
             # Mark files as uploaded
             uploaded_files.update(batch_images)
@@ -328,6 +332,20 @@ def main():
             import traceback
             print(traceback.format_exc())
             break
+    
+    # After all batches, create or update the Atlas map
+    if atlas_dataset is not None and map_id:
+        print("\nUpdating the Atlas map visualization...")
+        try:
+            # Create/update the map visualization if needed
+            atlas_map = atlas_dataset.create_index(
+                topic_model={"build_topic_model": False},
+                embedding_model="nomic-embed-vision-v1.5",
+                identifier=map_id
+            )
+            print(f"Successfully updated Atlas map visualization")
+        except Exception as e:
+            print(f"Warning: Could not update map visualization: {e}")
     
     if map_id:
         print(f"\nSuccessfully uploaded images to Atlas map: {map_id}")
