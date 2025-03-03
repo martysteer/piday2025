@@ -340,18 +340,31 @@ def main():
             break
     
     # After all batches, create or update the Atlas map visualization
-    if atlas_dataset is not None and map_id:
+    if atlas_dataset is not None:
         print("\nUpdating the Atlas map visualization...")
         try:
-            # Create/update the map visualization if needed
-            atlas_map = atlas_dataset.create_index(
-                topic_model={"build_topic_model": False},
-                embedding_model="nomic-embed-vision-v1.5",
-                identifier=map_id
-            )
-            print(f"Successfully updated Atlas map visualization")
+            # Create/update the map visualization
+            # If we have a map ID, use it, otherwise let Nomic create a new one
+            index_params = {
+                "topic_model": {"build_topic_model": False},
+                "embedding_model": "nomic-embed-vision-v1.5",
+            }
+            
+            if map_id:
+                index_params["name"] = map_id
+            
+            atlas_map = atlas_dataset.create_index(**index_params)
+            
+            # Update map_id if it was newly created
+            if map_id is None and atlas_map is not None:
+                map_id = atlas_map.id
+                update_tracking_file(args.track_file, uploaded_files, map_id, args.map_name, dataset_id)
+                
+            print(f"Successfully updated Atlas map visualization with ID: {map_id}")
         except Exception as e:
             print(f"Warning: Could not update map visualization: {e}")
+            import traceback
+            print(traceback.format_exc())
     
     if map_id:
         print(f"\nSuccessfully uploaded images to Atlas map: {map_id}")
