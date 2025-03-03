@@ -30,11 +30,29 @@ def find_image_files(input_dir):
     
     # Find all matching files
     for ext in extensions:
-        image_files.extend([str(f) for f in input_path.glob(f"**/*{ext}")])
-        image_files.extend([str(f) for f in input_path.glob(f"**/*{ext.upper()}")])
+        files = [str(f) for f in input_path.glob(f"**/*{ext}")]
+        image_files.extend(files)
+        print(f"Found {len(files)} files with extension {ext}")
+        
+        upper_files = [str(f) for f in input_path.glob(f"**/*{ext.upper()}")]
+        image_files.extend(upper_files)
+        if upper_files:
+            print(f"Found {len(upper_files)} files with extension {ext.upper()}")
     
     # Sort for reproducibility
     image_files.sort()
+    
+    # Print first few and last few files to verify recursion is working
+    if image_files:
+        print("\nSample of files found:")
+        for i, file in enumerate(image_files[:5]):
+            print(f"  {i+1}. {file}")
+        
+        if len(image_files) > 10:
+            print("  ...")
+            for i, file in enumerate(image_files[-5:]):
+                print(f"  {len(image_files)-4+i}. {file}")
+    
     return image_files
 
 def get_file_hash(filepath):
@@ -50,17 +68,34 @@ def get_file_hash(filepath):
 def get_uploaded_files(tracking_file):
     """Get the list of files that have already been uploaded."""
     uploaded = set()
+    map_id = None
+    map_name = None
     
     if Path(tracking_file).exists():
         try:
             with open(tracking_file, 'r') as f:
                 data = json.load(f)
                 uploaded = set(data.get('uploaded_files', []))
-                print(f"Found {len(uploaded)} already uploaded files")
+                map_id = data.get('map_id')
+                map_name = data.get('map_name')
+                print(f"Found tracking file with {len(uploaded)} already uploaded files")
+                
+                if map_id:
+                    print(f"Existing map ID: {map_id}")
+                
+                # Print first few uploaded files
+                if uploaded:
+                    print("Sample of already uploaded files:")
+                    for i, file in enumerate(list(uploaded)[:5]):
+                        print(f"  {i+1}. {file}")
+                    if len(uploaded) > 5:
+                        print(f"  ... and {len(uploaded) - 5} more")
         except Exception as e:
             print(f"Error reading tracking file: {e}")
+    else:
+        print(f"No tracking file found at {tracking_file}")
     
-    return uploaded
+    return uploaded, map_id, map_name
 
 def update_tracking_file(tracking_file, uploaded_files, map_id, map_name):
     """Update the tracking file with newly uploaded files."""
@@ -80,7 +115,8 @@ def prepare_metadata(image_files):
     metadata = []
     image_paths = []
     
-    for filepath in image_files:
+    print("\nPreparing metadata for images:")
+    for i, filepath in enumerate(image_files):
         path = Path(filepath)
         
         # Get subdirectory as label
@@ -91,14 +127,19 @@ def prepare_metadata(image_files):
         # Generate a unique ID for the file
         file_id = get_file_hash(filepath)
         
-        metadata.append({
+        item_metadata = {
             "id": file_id,
-            "filename": path.name,
-            "filepath": str(path),
+            # "filename": path.name,
+            # "filepath": str(path),
             "label": label
-        })
+        }
         
+        metadata.append(item_metadata)
         image_paths.append(filepath)
+        
+        # Print progress
+        if i < 5 or i >= len(image_files) - 5 or i % 20 == 0:
+            print(f"  Processing {i+1}/{len(image_files)}: {filepath} → label: '{label}'")
     
     return image_paths, metadata
 
@@ -110,27 +151,40 @@ def main():
     parser.add_argument("--map-name", "-n", default="PiDay2025", help="Name for the Atlas map")
     parser.add_argument("--batch-size", "-b", type=int, default=100, help="Number of images to upload in each batch")
     parser.add_argument("--new-map", action="store_true", help="Force creation of a new map")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Print verbose output")
     args = parser.parse_args()
+    
+    print("\n=== PiDay2025 Direct Image Upload ===")
+    print(f"Image directory: {args.image_dir}")
+    print(f"Tracking file: {args.track_file}")
+    print(f"Map name: {args.map_name}")
+    print(f"Batch size: {args.batch_size}")
+    print(f"Force new map: {args.new_map}")
     
     # Create directories if they don't exist
     Path(args.image_dir).mkdir(parents=True, exist_ok=True)
     Path(args.track_file).parent.mkdir(parents=True, exist_ok=True)
     
     # Find all image files
-    print(f"Searching for images in {args.image_dir}")
+    print(f"\nSearching for images in {args.image_dir}")
     all_image_files = find_image_files(args.image_dir)
-    print(f"Found {len(all_image_files)} image files")
+    print(f"Found {len(all_image_files)} total image files")
     
     if not all_image_files:
         print("No image files found. Exiting.")
         return
     
-    # Get already uploaded files
-    uploaded_files = get_uploaded_files(args.track_file)
+    # Get already uploaded files and map info
+    uploaded_files, existing_map_id, existing_map_name = get_uploaded_files(args.track_file)
+    
+    # Use existing map name if available and not specified
+    if existing_map_name and args.map_name == "PiDay2025":
+        args.map_name = existing_map_name
+        print(f"Using existing map name: {args.map_name}")
     
     # Filter out already uploaded files
     new_image_files = [f for f in all_image_files if f not in uploaded_files]
-    print(f"Found {len(new_image_files)} new files to upload")
+    print(f"\nFound {len(new_image_files)} new files to upload")
     
     if not new_image_files:
         print("No new files to upload. Exiting.")
@@ -139,14 +193,11 @@ def main():
     # Get map ID from tracking file if not creating a new map
     map_id = None
     if not args.new_map:
-        try:
-            with open(args.track_file, 'r') as f:
-                data = json.load(f)
-                map_id = data.get('map_id')
-                if map_id:
-                    print(f"Using existing map: {map_id}")
-        except:
-            pass
+        map_id = existing_map_id
+        if map_id:
+            print(f"Using existing map ID: {map_id}")
+        else:
+            print("No existing map ID found. Will create a new map.")
     
     # Prepare metadata for all images
     image_paths, metadata = prepare_metadata(new_image_files)
@@ -157,12 +208,29 @@ def main():
     
     print(f"Uploading {len(image_paths)} images in batches of {batch_size}")
     
+    # Print directory structure information
+    print("\nDirectory structure summary:")
+    labels = {}
+    for meta in metadata:
+        label = meta["label"]
+        if label in labels:
+            labels[label] += 1
+        else:
+            labels[label] = 1
+    
+    for label, count in labels.items():
+        print(f"  {label}: {count} images")
+    
+    # Process batches    
     for i in range(0, len(image_paths), batch_size):
         batch_end = min(i + batch_size, len(image_paths))
         batch_images = image_paths[i:batch_end]
         batch_metadata = metadata[i:batch_end]
         
-        print(f"Processing batch {i//batch_size + 1}/{(len(image_paths) + batch_size - 1) // batch_size} ({len(batch_images)} images)")
+        print(f"\nProcessing batch {i//batch_size + 1}/{(len(image_paths) + batch_size - 1) // batch_size} ({len(batch_images)} images)")
+        print("First few images in this batch:")
+        for j, img in enumerate(batch_images[:min(3, len(batch_images))]):
+            print(f"  {j+1}. {img}")
         
         try:
             if map_id is None or args.new_map:
@@ -190,9 +258,13 @@ def main():
             # Mark files as uploaded
             uploaded_files.update(batch_images)
             update_tracking_file(args.track_file, uploaded_files, map_id, args.map_name)
+            print(f"Successfully uploaded batch {i//batch_size + 1}")
             
         except Exception as e:
             print(f"Error uploading batch: {str(e)}")
+            # Print more details about the error
+            import traceback
+            print(traceback.format_exc())
             break
     
     if map_id:
