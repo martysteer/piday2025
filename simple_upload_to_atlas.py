@@ -70,6 +70,7 @@ def get_uploaded_files(tracking_file):
     uploaded = set()
     map_id = None
     map_name = None
+    dataset_id = None
     
     if Path(tracking_file).exists():
         try:
@@ -78,10 +79,14 @@ def get_uploaded_files(tracking_file):
                 uploaded = set(data.get('uploaded_files', []))
                 map_id = data.get('map_id')
                 map_name = data.get('map_name')
+                dataset_id = data.get('dataset_id')
                 print(f"Found tracking file with {len(uploaded)} already uploaded files")
                 
                 if map_id:
                     print(f"Existing map ID: {map_id}")
+                
+                if dataset_id:
+                    print(f"Existing dataset ID: {dataset_id}")
                 
                 # Print first few uploaded files
                 if uploaded:
@@ -95,13 +100,14 @@ def get_uploaded_files(tracking_file):
     else:
         print(f"No tracking file found at {tracking_file}")
     
-    return uploaded, map_id, map_name
+    return uploaded, map_id, map_name, dataset_id
 
-def update_tracking_file(tracking_file, uploaded_files, map_id, map_name):
+def update_tracking_file(tracking_file, uploaded_files, map_id, map_name, dataset_id=None):
     """Update the tracking file with newly uploaded files."""
     data = {
         'map_id': map_id,
         'map_name': map_name,
+        'dataset_id': dataset_id,
         'uploaded_files': list(uploaded_files)
     }
     
@@ -109,6 +115,9 @@ def update_tracking_file(tracking_file, uploaded_files, map_id, map_name):
         json.dump(data, f, indent=2)
     
     print(f"Updated tracking file with {len(uploaded_files)} uploaded files")
+    if dataset_id:
+        print(f"Dataset ID: {dataset_id}")
+    print(f"Map ID: {map_id}")
 
 def prepare_metadata(image_files):
     """Prepare metadata for each image."""
@@ -129,8 +138,6 @@ def prepare_metadata(image_files):
         
         item_metadata = {
             "id": file_id,
-            # "filename": path.name,
-            # "filepath": str(path),
             "label": label
         }
         
@@ -152,6 +159,7 @@ def main():
     parser.add_argument("--batch-size", "-b", type=int, default=100, help="Number of images to upload in each batch")
     parser.add_argument("--new-map", action="store_true", help="Force creation of a new map")
     parser.add_argument("--verbose", "-v", action="store_true", help="Print verbose output")
+    parser.add_argument("--dataset-id", "-d", help="Specify dataset ID directly (username/dataset_name)")
     args = parser.parse_args()
     
     print("\n=== PiDay2025 Direct Image Upload ===")
@@ -160,6 +168,8 @@ def main():
     print(f"Map name: {args.map_name}")
     print(f"Batch size: {args.batch_size}")
     print(f"Force new map: {args.new_map}")
+    if args.dataset_id:
+        print(f"Dataset ID: {args.dataset_id}")
     
     # Create directories if they don't exist
     Path(args.image_dir).mkdir(parents=True, exist_ok=True)
@@ -243,21 +253,67 @@ def main():
                     description=f"{args.map_name} Exhibition Images"
                 )
                 map_id = atlas_map.id
+                
+                # Extract dataset_id from the output
+                # Dataset ID format is typically "username/dataset_name"
+                # We can extract it from the logs or directly from the atlas_map object
+                dataset_id = atlas_map.project_id
+                if not dataset_id:
+                    # Try to parse from the URL
+                    if hasattr(atlas_map, 'url'):
+                        parts = atlas_map.url.split('/')
+                        if len(parts) >= 3:
+                            # Extract "username/dataset_name" from URL
+                            dataset_id = f"{parts[-2]}/{parts[-1]}"
+                
                 args.new_map = False  # Set to False so we update this map for subsequent batches
                 print(f"Created new Atlas map with ID: {map_id}")
+                if dataset_id:
+                    print(f"Dataset ID: {dataset_id}")
             else:
                 # Update existing map
                 print(f"Adding to existing Atlas map: {map_id}")
-                atlas_dataset = atlas.AtlasDataset(map_id)
-                atlas_dataset.add_data(
-                    blobs=batch_images,
-                    data=batch_metadata
-                )
-                print(f"Added batch to Atlas map {map_id}")
+                if dataset_id:
+                    print(f"Using dataset ID: {dataset_id}")
+                    # Use dataset_id to add data
+                    atlas_dataset = atlas.AtlasDataset(dataset_id)
+                    atlas_dataset.add_data(
+                        blobs=batch_images,
+                        data=batch_metadata
+                    )
+                    print(f"Added batch to Atlas dataset {dataset_id}")
+                else:
+                    # Fallback to try using the map name
+                    username = os.getenv("NOMIC_USERNAME", "")  # Try to get username from env
+                    if not username:
+                        # Try to extract from existing dataset ID if available
+                        if existing_dataset_id and '/' in existing_dataset_id:
+                            username = existing_dataset_id.split('/')[0]
+                    
+                    # If we found a username, use it to construct dataset ID
+                    if username:
+                        # Convert map name to lowercase and replace spaces with underscores
+                        safe_name = args.map_name.lower().replace(' ', '_').replace('-', '_')
+                        dataset_id = f"{username}/{safe_name}"
+                        print(f"Constructed dataset ID: {dataset_id}")
+                        
+                        try:
+                            atlas_dataset = atlas.AtlasDataset(dataset_id)
+                            atlas_dataset.add_data(
+                                blobs=batch_images,
+                                data=batch_metadata
+                            )
+                            print(f"Added batch to Atlas dataset {dataset_id}")
+                        except Exception as e:
+                            print(f"Error with constructed dataset ID: {str(e)}")
+                            raise
+                    else:
+                        print("Cannot determine dataset ID. Please specify with --dataset-id")
+                        raise ValueError("Missing dataset ID for updating existing map")
             
             # Mark files as uploaded
             uploaded_files.update(batch_images)
-            update_tracking_file(args.track_file, uploaded_files, map_id, args.map_name)
+            update_tracking_file(args.track_file, uploaded_files, map_id, args.map_name, dataset_id)
             print(f"Successfully uploaded batch {i//batch_size + 1}")
             
         except Exception as e:
