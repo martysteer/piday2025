@@ -208,7 +208,6 @@ def main():
     parser.add_argument("--map-name", "-n", default="PiDay2025", help="Name for the Atlas map")
     parser.add_argument("--batch-size", "-b", type=int, default=20, help="Number of images to upload in each batch")
     parser.add_argument("--new-map", action="store_true", help="Force creation of a new map")
-    parser.add_argument("--verbose", "-v", action="store_true", help="Print verbose output")
     parser.add_argument("--dataset-id", "-d", default="martysteer/piday2025", help="Specify dataset ID directly (username/dataset_name)")
     args = parser.parse_args()
     
@@ -344,12 +343,12 @@ def main():
         print("\nUpdating the Atlas map visualization...")
         try:
             # Create/update the map visualization
-            # If we have a map ID, use it, otherwise let Nomic create a new one
             index_params = {
                 "topic_model": {"build_topic_model": False},
                 "embedding_model": "nomic-embed-vision-v1.5",
             }
             
+            # If we have a map ID, use it, otherwise let Nomic create a new one
             if map_id:
                 index_params["name"] = map_id
             
