@@ -127,9 +127,9 @@ def main():
         print(f"Initial settings: orientation={orientation_mode}, rotation={rotation_angle}°, flipped={horizontal_flip}")
         print("\nButton controls:")
         print("  A: Flip image horizontally")
-        print("  B: Toggle between portrait/landscape orientation")
-        print("  X: Rotate image 90° clockwise")
-        print("  Y: Toggle info overlay")
+        print("  B: Rotate image 90° clockwise")
+        print("  X: Toggle info overlay")
+        print("  Y: Clear screen and quit")
         print("\nPress Ctrl+C to exit")
         
         # Main loop with manual button polling
@@ -156,26 +156,26 @@ def main():
                     update_display()
                     
                 if curr_b and not prev_b:
-                    # B: Toggle orientation
-                    is_portrait = not is_portrait
-                    orientation_mode = "portrait" if is_portrait else "landscape"
-                    print(f"Switching to {orientation_mode} orientation")
+                    # B: Rotate 90° clockwise
+                    rotation_angle = (rotation_angle + 90) % 360
+                    print(f"Rotating to {rotation_angle}°")
                     display.set_led(0, 1, 0)  # Green flash
                     update_display()
                     
                 if curr_x and not prev_x:
-                    # X: Rotate 90° clockwise
-                    rotation_angle = (rotation_angle + 90) % 360
-                    print(f"Rotating to {rotation_angle}°")
+                    # X: Toggle info overlay
+                    show_info = not show_info
+                    print(f"Info overlay: {show_info}")
                     display.set_led(0, 0, 1)  # Blue flash
                     update_display()
                     
                 if curr_y and not prev_y:
-                    # Y: Toggle info overlay
-                    show_info = not show_info
-                    print(f"Info overlay: {show_info}")
+                    # Y: Clear screen and quit
+                    print("Clearing screen and exiting...")
                     display.set_led(1, 0, 1)  # Purple flash
-                    update_display()
+                    time.sleep(0.2)
+                    clear_display(display)
+                    sys.exit(0)
                 
                 # Update previous button states
                 prev_a = curr_a
