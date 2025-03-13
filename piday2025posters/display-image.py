@@ -262,12 +262,42 @@ def main():
             time.sleep(0.1)
             display.set_led(0.1, 0.1, 0.1)
         
-        # Register button handler
-        display.on_button_pressed(button_handler)
+        # Instead of using callbacks which might fail with the "Failed to add edge detection" error,
+        # we'll manually poll the button states in the main loop
+        print("Using manual button polling instead of edge detection")
         
         # Main loop to keep the program running
         try:
+            # Track previous button states to detect transitions
+            prev_a = False
+            prev_b = False
+            prev_x = False
+            prev_y = False
+            
             while True:
+                # Read current button states
+                curr_a = display.read_button(display.BUTTON_A)
+                curr_b = display.read_button(display.BUTTON_B)
+                curr_x = display.read_button(display.BUTTON_X)
+                curr_y = display.read_button(display.BUTTON_Y)
+                
+                # Check for button presses (transitions from not pressed to pressed)
+                if curr_a and not prev_a:
+                    button_handler(display.BUTTON_A)
+                if curr_b and not prev_b:
+                    button_handler(display.BUTTON_B)
+                if curr_x and not prev_x:
+                    button_handler(display.BUTTON_X)
+                if curr_y and not prev_y:
+                    button_handler(display.BUTTON_Y)
+                
+                # Update previous button states
+                prev_a = curr_a
+                prev_b = curr_b
+                prev_x = curr_x
+                prev_y = curr_y
+                
+                # Short delay to prevent CPU hogging
                 time.sleep(0.1)
         except KeyboardInterrupt:
             print("\nExiting...")
