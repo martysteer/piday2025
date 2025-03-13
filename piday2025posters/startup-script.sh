@@ -1,48 +1,60 @@
 #!/bin/bash
 
-# Display HAT Mini Slideshow startup script
-# Save this as /home/pi/start_slideshow.sh
+# Display HAT Mini Image Gallery startup script
+# Save this as /home/pi/piday2025/piday2025posters/startup-script.sh
 
-# Configuration - you can modify these settings
-IMAGE_DIR="/home/pi/slideshow_images"
-DELAY=10
-TRANSITION="fade"  # none, fade, or slide
-RANDOM=true        # true for random order, false for alphabetical
-BRIGHTNESS=1.0     # 0.0 to 1.0
-SHOW_INFO=true     # true to show image info, false to hide it
+# Path to the script directory - adjust if needed
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+IMAGE_DIR="${SCRIPT_DIR}/images"
+
+# Configuration - align with image-gallery.py options
+DELAY=5.0                 # Time in seconds between slides
+TRANSITION="fade"         # none, fade, or slide
+SORT="random"             # name, date, size, random
+BRIGHTNESS=0.9            # 0.1 to 1.0
+ORIENTATION="landscape"   # landscape or portrait
+SHOW_INFO=true            # true to show image info, false to hide it
+
+# Log file for debugging
+LOG_FILE="${SCRIPT_DIR}/gallery.log"
 
 # Create image directory if it doesn't exist
 mkdir -p "$IMAGE_DIR"
 
+# Log startup information
+echo "$(date): Starting Display HAT Mini Gallery" > "$LOG_FILE"
+echo "Image directory: $IMAGE_DIR" >> "$LOG_FILE"
+echo "Number of images: $(ls -1 "$IMAGE_DIR" | wc -l)" >> "$LOG_FILE"
+
 # Create a message to display if there are no images
 if [ ! "$(ls -A $IMAGE_DIR)" ]; then
-    echo "No images found in slideshow directory."
+    echo "No images found in gallery directory." >> "$LOG_FILE"
     echo "Please add some images to $IMAGE_DIR"
 fi
 
 # Build the command with appropriate arguments
-CMD="python3 /home/pi/photo_slideshow.py"
-CMD="$CMD --dir $IMAGE_DIR"
+CMD="python3 ${SCRIPT_DIR}/image-gallery.py"
+CMD="$CMD '$IMAGE_DIR'"
 CMD="$CMD --delay $DELAY"
 CMD="$CMD --transition $TRANSITION"
+CMD="$CMD --sort $SORT"
 CMD="$CMD --brightness $BRIGHTNESS"
+CMD="$CMD --slideshow"  # Start in slideshow mode
 
-# Add optional arguments based on configuration
-if [ "$RANDOM" = true ]; then
-    CMD="$CMD --random"
+# Add options based on configuration
+if [ "$ORIENTATION" == "portrait" ]; then
+    CMD="$CMD --portrait"
 else
-    CMD="$CMD --no-random"
+    CMD="$CMD --landscape"
 fi
 
-if [ "$SHOW_INFO" = false ]; then
-    CMD="$CMD --hide-info"
+if [ "$SHOW_INFO" == false ]; then
+    CMD="$CMD --no-info"
 fi
 
 # Log the command we're running
-echo "Starting slideshow with command:"
-echo "$CMD"
+echo "Command: $CMD" >> "$LOG_FILE"
 
-# Run the slideshow script
-cd /home/pi
-$CMD
-
+# Run the image gallery script
+cd "$SCRIPT_DIR"
+eval "$CMD" >> "$LOG_FILE" 2>&1
