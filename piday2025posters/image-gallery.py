@@ -36,9 +36,10 @@ from display_hat_utils import (
 )
 
 # Global constants
-FADE_STEPS = 10
-SLIDE_STEPS = 15
-MENU_TIMEOUT = 10  # Seconds before menu auto-closes
+FADE_STEPS = 10      # Number of steps in fade transition
+SLIDE_STEPS = 15     # Number of steps in slide transition
+SLIDE_DIRECTION = 1  # 1 = right to left, -1 = left to right
+MENU_TIMEOUT = 10    # Seconds before menu auto-closes
 
 def parse_arguments():
     """Parse command-line arguments."""
@@ -50,6 +51,7 @@ def parse_arguments():
     parser.add_argument('--extensions', '-e', type=str, default='.jpg,.jpeg,.png,.bmp,.gif',
                         help='Comma-separated list of file extensions to include (default: .jpg,.jpeg,.png,.bmp,.gif)')
     
+    # Orientation options (mutually exclusive)
     orientation_group = parser.add_mutually_exclusive_group()
     orientation_group.add_argument('--portrait', '-p', action='store_true', 
                         help='Display in portrait orientation')
@@ -64,12 +66,13 @@ def parse_arguments():
     parser.add_argument('--brightness', '-b', type=float, default=1.0,
                         help='Screen brightness level 0.0-1.0 (default: 1.0)')
     
+    # Slideshow options
     parser.add_argument('--slideshow', '-s', action='store_true',
                         help='Start in slideshow mode')
-    
     parser.add_argument('--delay', '-d', type=float, default=5.0,
                         help='Slideshow delay in seconds (default: 5.0)')
     
+    # Transition effects
     parser.add_argument('--transition', '-t', choices=['none', 'fade', 'slide'], default='none',
                         help='Transition effect between images (default: none)')
     
@@ -114,12 +117,24 @@ def transition_effect(display, current_image, next_image, effect='none'):
             time.sleep(0.02)  # Short delay between steps
     
     elif effect == 'slide':
-        # Apply slide transition (from right to left)
+        direction = SLIDE_DIRECTION  # 1 = right to left, -1 = left to right
+        
+        # Apply slide transition
         for step in range(SLIDE_STEPS + 1):
-            offset = int((width * (SLIDE_STEPS - step)) / SLIDE_STEPS)
-            composite = Image.new("RGB", (width, height))
-            composite.paste(current_image, (-offset, 0))
-            composite.paste(next_image, (width - offset, 0))
+            progress = step / SLIDE_STEPS
+            offset = int(width * (1.0 - progress))
+            
+            if direction > 0:
+                # Right to left (new image comes from right)
+                composite = Image.new("RGB", (width, height))
+                composite.paste(current_image, (-offset * direction, 0))
+                composite.paste(next_image, (width - offset * direction, 0))
+            else:
+                # Left to right (new image comes from left)
+                composite = Image.new("RGB", (width, height))
+                composite.paste(current_image, (offset * -direction, 0))
+                composite.paste(next_image, (offset * -direction - width, 0))
+                
             display.buffer.paste(composite)
             display.display()
             time.sleep(0.02)  # Short delay between steps
@@ -181,6 +196,9 @@ def change_setting_value(setting_type, current_value, direction=1):
         current_index = transitions.index(current_value)
         new_index = (current_index + direction) % len(transitions)
         return transitions[new_index]
+    elif setting_type == "slide_direction":
+        # Toggle between left-to-right and right-to-left
+        return -1 if current_value == 1 else 1
     elif setting_type == "sort":
         sort_methods = ["name", "date", "size", "random"]
         current_index = sort_methods.index(current_value)
@@ -199,12 +217,15 @@ def change_setting_value(setting_type, current_value, direction=1):
 
 def settings_menu(display, current_settings):
     """Display and handle the settings menu."""
+    global SLIDE_DIRECTION
+    
     # Define menu options with their types
     options = [
         ("Slideshow Mode", "bool"),
         ("Show Info", "bool"),
         ("Orientation", "orientation"),
         ("Transition", "transition"),
+        ("Slide Direction", "slide_direction"),
         ("Sort Method", "sort"),
         ("Slide Delay", "float"),
         ("Brightness", "brightness")
@@ -216,6 +237,7 @@ def settings_menu(display, current_settings):
         current_settings["show_info"],
         current_settings["orientation"],
         current_settings["transition"],
+        SLIDE_DIRECTION,
         current_settings["sort_method"],
         current_settings["slide_delay"],
         current_settings["brightness"]
@@ -297,9 +319,11 @@ def settings_menu(display, current_settings):
     current_settings["show_info"] = values[1]
     current_settings["orientation"] = values[2]
     current_settings["transition"] = values[3]
-    current_settings["sort_method"] = values[4]
-    current_settings["slide_delay"] = values[5]
-    current_settings["brightness"] = values[6]
+    global SLIDE_DIRECTION
+    SLIDE_DIRECTION = values[4]
+    current_settings["sort_method"] = values[5]
+    current_settings["slide_delay"] = values[6]
+    current_settings["brightness"] = values[7]
     
     # Apply brightness immediately
     display.set_backlight(current_settings["brightness"])
@@ -373,32 +397,38 @@ def main():
         nonlocal current_index
         
         # Load the current image
-        current_image = load_image(image_files[current_index])
-        if current_image is None:
-            display_info_message(display, "Error", f"Could not load {os.path.basename(image_files[current_index])}")
+        try:
+            current_image = load_image(image_files[current_index])
+            if current_image is None:
+                display_info_message(display, "Error", f"Could not load {os.path.basename(image_files[current_index])}")
+                time.sleep(1)
+                return None
+            
+            # Process the image with current settings
+            is_portrait = settings["orientation"] == "portrait"
+            processed_image = process_image(
+                current_image, 
+                is_portrait=is_portrait, 
+                rotation=rotation_angle, 
+                flip_horizontal=horizontal_flip
+            )
+            
+            # Add info overlay if enabled
+            if settings["show_info"]:
+                processed_image = overlay_info(
+                    processed_image, 
+                    image_files[current_index], 
+                    current_index, 
+                    len(image_files),
+                    is_portrait=is_portrait
+                )
+            
+            return processed_image
+        except Exception as e:
+            print(f"Error processing image: {str(e)}")
+            display_info_message(display, "Error", str(e))
             time.sleep(1)
             return None
-        
-        # Process the image with current settings
-        is_portrait = settings["orientation"] == "portrait"
-        processed_image = process_image(
-            current_image, 
-            is_portrait=is_portrait, 
-            rotation=rotation_angle, 
-            flip_horizontal=horizontal_flip
-        )
-        
-        # Add info overlay if enabled
-        if settings["show_info"]:
-            processed_image = overlay_info(
-                processed_image, 
-                image_files[current_index], 
-                current_index, 
-                len(image_files),
-                is_portrait=is_portrait
-            )
-        
-        return processed_image
     
     # Initial display update
     current_image = update_display()
