@@ -319,8 +319,7 @@ def settings_menu(display, current_settings):
     current_settings["show_info"] = values[1]
     current_settings["orientation"] = values[2]
     current_settings["transition"] = values[3]
-    global SLIDE_DIRECTION
-    SLIDE_DIRECTION = values[4]
+    SLIDE_DIRECTION = values[4]  # Using global variable (declared at function start)
     current_settings["sort_method"] = values[5]
     current_settings["slide_delay"] = values[6]
     current_settings["brightness"] = values[7]
