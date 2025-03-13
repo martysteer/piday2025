@@ -139,8 +139,8 @@ def display_info_message(display, message, submessage=""):
         
         draw.text((subtext_x, subtext_y), submessage, font=sub_font, fill=(200, 200, 200))
     
-    # Update the display
-    display.buffer = image
+    # Update the display - paste to the buffer instead of replacing it
+    display.buffer.paste(image)
     display.display()
 
 def load_image(image_path):

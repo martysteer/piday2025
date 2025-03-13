@@ -83,6 +83,7 @@ def main():
         
         # Display loading message
         display_info_message(display, "Loading Image", os.path.basename(args.image))
+        time.sleep(0.5)  # Brief delay to ensure message is visible
         
         # Load the image
         original_image = load_image(args.image)
