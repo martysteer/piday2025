@@ -1,6 +1,6 @@
 [Unit]
 Description=Display HAT Mini Image Gallery
-After=multi-user.target
+After=network.target
 
 [Service]
 Type=simple
@@ -8,8 +8,10 @@ User=pi
 WorkingDirectory=/home/pi/piday2025/piday2025posters
 ExecStart=/home/pi/piday2025/piday2025posters/startup-script.sh
 Restart=on-failure
+RestartSec=10
 StandardOutput=journal
 StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
+EOF
