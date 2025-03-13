@@ -2,7 +2,8 @@
 import argparse
 import time
 import os
-from PIL import Image, ImageDraw, ImageFont
+import sys
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 from displayhatmini import DisplayHATMini
 
 def parse_arguments():
@@ -15,22 +16,45 @@ def parse_arguments():
                         help='Display in landscape orientation (default)')
     return parser.parse_args()
 
-def resize_image(image, is_portrait=False):
-    """Resize image based on orientation while preserving aspect ratio."""
+def process_image(image, is_portrait=False, rotation=0, flip_horizontal=False):
+    """
+    Process image based on current transformation settings.
+    
+    Args:
+        image: The original PIL Image
+        is_portrait: Whether to display in portrait orientation
+        rotation: Rotation angle in degrees (0, 90, 180, 270)
+        flip_horizontal: Whether to flip the image horizontally
+        
+    Returns:
+        Processed PIL Image ready for display
+    """
+    # Make a copy of the image to avoid modifying the original
+    img = image.copy()
+    
+    # Apply horizontal flip if needed
+    if flip_horizontal:
+        img = ImageOps.mirror(img)
+    
+    # Apply rotation if needed
+    if rotation != 0:
+        img = img.rotate(rotation, expand=True)
+    
+    # Resize based on orientation
     display_width = DisplayHATMini.WIDTH
     display_height = DisplayHATMini.HEIGHT
     
     if is_portrait:
         # For portrait mode, we'll rotate after resizing
         # Calculate scaling ratios
-        width_ratio = display_height / image.width
-        height_ratio = display_width / image.height
+        width_ratio = display_height / img.width
+        height_ratio = display_width / img.height
         ratio = min(width_ratio, height_ratio)
         
         # Resize the image maintaining aspect ratio
-        new_width = int(image.width * ratio)
-        new_height = int(image.height * ratio)
-        resized_image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        new_width = int(img.width * ratio)
+        new_height = int(img.height * ratio)
+        resized_image = img.resize((new_width, new_height), Image.LANCZOS)
         
         # Create a canvas matching the rotated display dimensions
         result = Image.new("RGB", (display_height, display_width), (0, 0, 0))
@@ -47,14 +71,14 @@ def resize_image(image, is_portrait=False):
         
     else:  # landscape mode (default)
         # Calculate scaling ratios
-        width_ratio = display_width / image.width
-        height_ratio = display_height / image.height
+        width_ratio = display_width / img.width
+        height_ratio = display_height / img.height
         ratio = min(width_ratio, height_ratio)
         
         # Resize the image maintaining aspect ratio
-        new_width = int(image.width * ratio)
-        new_height = int(image.height * ratio)
-        resized_image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        new_width = int(img.width * ratio)
+        new_height = int(img.height * ratio)
+        resized_image = img.resize((new_width, new_height), Image.LANCZOS)
         
         # Create a canvas of the display size
         result = Image.new("RGB", (display_width, display_height), (0, 0, 0))
@@ -68,8 +92,8 @@ def resize_image(image, is_portrait=False):
     
     return result
 
-def display_button_name(display, button_name):
-    """Display the button name in the center of the screen."""
+def display_info_message(display, message, submessage=""):
+    """Display a message in the center of the screen."""
     width = DisplayHATMini.WIDTH
     height = DisplayHATMini.HEIGHT
     
@@ -79,46 +103,44 @@ def display_button_name(display, button_name):
     
     # Try to load a font, fall back to default if necessary
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 32)
+        main_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 24)
+        sub_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 16)
     except IOError:
-        font = ImageFont.load_default()
+        main_font = ImageFont.load_default()
+        sub_font = ImageFont.load_default()
     
     # Get text size for centering
-    # For older PIL versions that don't have textbbox
     try:
-        _, _, text_width, text_height = draw.textbbox((0, 0), button_name, font=font)
-        text_width -= 0  # Adjust for textbbox offset
-        text_height -= 0  # Adjust for textbbox offset
+        # For newer PIL versions
+        _, _, text_width, text_height = draw.textbbox((0, 0), message, font=main_font)
     except AttributeError:
         # Fallback for older PIL versions
-        text_width, text_height = draw.textsize(button_name, font=font)
+        text_width, text_height = draw.textsize(message, font=main_font)
     
     # Calculate position to center the text
     text_x = (width - text_width) // 2
-    text_y = (height - text_height) // 2
+    text_y = (height - text_height) // 2 - 15 if submessage else (height - text_height) // 2
     
-    # Draw the text
-    draw.text((text_x, text_y), button_name, font=font, fill=(255, 255, 255))
+    # Draw the main message
+    draw.text((text_x, text_y), message, font=main_font, fill=(255, 255, 255))
+    
+    # Draw submessage if provided
+    if submessage:
+        try:
+            # For newer PIL versions
+            _, _, subtext_width, subtext_height = draw.textbbox((0, 0), submessage, font=sub_font)
+        except AttributeError:
+            # Fallback for older PIL versions
+            subtext_width, subtext_height = draw.textsize(submessage, font=sub_font)
+        
+        subtext_x = (width - subtext_width) // 2
+        subtext_y = text_y + text_height + 10
+        
+        draw.text((subtext_x, subtext_y), submessage, font=sub_font, fill=(200, 200, 200))
     
     # Update the display
     display.buffer = image
     display.display()
-
-def button_callback(pin, display):
-    """Handle button press events."""
-    # Only handle button presses (not releases)
-    if not display.read_button(pin):
-        return
-    
-    # Determine which button was pressed
-    if pin == display.BUTTON_A:
-        display_button_name(display, "Button A")
-    elif pin == display.BUTTON_B:
-        display_button_name(display, "Button B")
-    elif pin == display.BUTTON_X:
-        display_button_name(display, "Button X")
-    elif pin == display.BUTTON_Y:
-        display_button_name(display, "Button Y")
 
 def main():
     args = parse_arguments()
@@ -136,78 +158,137 @@ def main():
         # Default to landscape if neither specified
         if not is_portrait and not is_landscape:
             is_landscape = True
+            is_portrait = False
             
         # Load the image
-        image = Image.open(args.image)
+        original_image = Image.open(args.image)
         
         # Convert image to RGB mode if it's not already
-        if image.mode != "RGB":
-            image = image.convert("RGB")
+        if original_image.mode != "RGB":
+            original_image = original_image.convert("RGB")
             
         # Get image dimensions before processing
-        print(f"Original image dimensions: {image.width}x{image.height}")
+        print(f"Original image dimensions: {original_image.width}x{original_image.height}")
         
-        # Determine orientation to use
-        orientation = "portrait" if is_portrait else "landscape"
-        print(f"Using {orientation} orientation")
+        # Initialize transformation state
+        orientation_mode = "portrait" if is_portrait else "landscape"
+        rotation_angle = 0
+        horizontal_flip = False
         
-        # Resize based on selected orientation
-        display_image = resize_image(image, is_portrait=is_portrait)
+        # Initialize display with a blank image
+        buffer = Image.new("RGB", (DisplayHATMini.WIDTH, DisplayHATMini.HEIGHT), (0, 0, 0))
+        display = DisplayHATMini(buffer)
         
-        # Initialize the Display HAT Mini with the processed image
-        display = DisplayHATMini(display_image)
+        # Set a subtle LED indicator
+        display.set_led(0.1, 0.1, 0.1)
         
-        # Set up button handling without callbacks (manually polling)
-        print("Button callbacks failed, using manual polling instead")
+        # Process image with initial settings
+        processed_image = process_image(
+            original_image, 
+            is_portrait=is_portrait, 
+            rotation=rotation_angle, 
+            flip_horizontal=horizontal_flip
+        )
         
-        # Display the image
+        # Display the initial image
+        buffer.paste(processed_image)
         display.display()
         
+        # Show initial status
         print(f"Displaying image: {args.image}")
-        print("Press buttons A, B, X, or Y to display button names")
-        print("Press Ctrl+C to exit")
+        print(f"Initial settings: orientation={orientation_mode}, rotation={rotation_angle}°, flipped={horizontal_flip}")
+        print("\nButton controls:")
+        print("  A: Flip image horizontally")
+        print("  B: Toggle between portrait/landscape orientation")
+        print("  X: Rotate image 90° clockwise")
+        print("  Y: Clear the screen and quit")
+        print("\nPress Ctrl+C to exit")
         
-        try:
-            # Previous button states
-            prev_a = False
-            prev_b = False
-            prev_x = False
-            prev_y = False
+        # Define button callback for interactive control
+        def button_handler(pin):
+            nonlocal orientation_mode, rotation_angle, horizontal_flip, is_portrait
             
+            # Only handle button presses (not releases)
+            if not display.read_button(pin):
+                return
+                
+            if pin == display.BUTTON_A:
+                # A: Flip image horizontally
+                horizontal_flip = not horizontal_flip
+                print(f"Flipping image horizontally: {horizontal_flip}")
+                display.set_led(1, 0, 0)  # Red flash
+                
+            elif pin == display.BUTTON_B:
+                # B: Toggle orientation
+                is_portrait = not is_portrait
+                orientation_mode = "portrait" if is_portrait else "landscape"
+                print(f"Switching to {orientation_mode} orientation")
+                display.set_led(0, 1, 0)  # Green flash
+                
+            elif pin == display.BUTTON_X:
+                # X: Rotate 90° clockwise
+                rotation_angle = (rotation_angle + 90) % 360
+                print(f"Rotating to {rotation_angle}°")
+                display.set_led(0, 0, 1)  # Blue flash
+                
+            elif pin == display.BUTTON_Y:
+                # Y: Clear screen and quit
+                print("Clearing screen and exiting...")
+                display.set_led(1, 1, 1)  # White flash
+                
+                # Clear the screen
+                buffer.paste(Image.new("RGB", (DisplayHATMini.WIDTH, DisplayHATMini.HEIGHT), (0, 0, 0)))
+                display.display()
+                
+                # Turn off LED
+                display.set_led(0, 0, 0)
+                
+                # Exit program
+                time.sleep(0.5)  # Brief delay to see the flash
+                sys.exit(0)
+            
+            # Process and display the updated image
+            processed_image = process_image(
+                original_image, 
+                is_portrait=is_portrait, 
+                rotation=rotation_angle, 
+                flip_horizontal=horizontal_flip
+            )
+            
+            buffer.paste(processed_image)
+            display.display()
+            
+            # Reset LED to subtle indicator after a brief flash
+            time.sleep(0.1)
+            display.set_led(0.1, 0.1, 0.1)
+        
+        # Register button handler
+        display.on_button_pressed(button_handler)
+        
+        # Main loop to keep the program running
+        try:
             while True:
-                # Read current button states
-                curr_a = display.read_button(display.BUTTON_A)
-                curr_b = display.read_button(display.BUTTON_B)
-                curr_x = display.read_button(display.BUTTON_X)
-                curr_y = display.read_button(display.BUTTON_Y)
-                
-                # Check for button presses (transitions from not pressed to pressed)
-                if curr_a and not prev_a:
-                    display_button_name(display, "Button A")
-                    print("Button A pressed")
-                if curr_b and not prev_b:
-                    display_button_name(display, "Button B")
-                    print("Button B pressed")
-                if curr_x and not prev_x:
-                    display_button_name(display, "Button X")
-                    print("Button X pressed")
-                if curr_y and not prev_y:
-                    display_button_name(display, "Button Y")
-                    print("Button Y pressed")
-                
-                # Update previous states
-                prev_a = curr_a
-                prev_b = curr_b
-                prev_x = curr_x
-                prev_y = curr_y
-                
-                # Short delay to prevent CPU hogging
                 time.sleep(0.1)
         except KeyboardInterrupt:
             print("\nExiting...")
+            display.set_led(0, 0, 0)  # Turn off LED
+            
+            # Clear the screen on exit
+            buffer.paste(Image.new("RGB", (DisplayHATMini.WIDTH, DisplayHATMini.HEIGHT), (0, 0, 0)))
+            display.display()
             
     except Exception as e:
         print(f"Error: {e}")
+        
+        # Try to display error message on the screen if display is initialized
+        try:
+            if 'display' in locals():
+                display_info_message(display, "Error", str(e))
+                display.set_led(1, 0, 0)  # Red LED to indicate error
+                time.sleep(5)  # Show error for 5 seconds
+                display.set_led(0, 0, 0)  # Turn off LED
+        except:
+            pass
 
 if __name__ == "__main__":
     main()
