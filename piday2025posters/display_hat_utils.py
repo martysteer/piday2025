@@ -269,3 +269,4 @@ def clear_display(display):
     display.buffer.paste(black_screen)
     display.display()
     display.set_led(0, 0, 0)  # Turn off LED
+    display.set_backlight(0)  # Turn off backlight completely

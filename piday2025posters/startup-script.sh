@@ -8,12 +8,11 @@ SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 IMAGE_DIR="${SCRIPT_DIR}/images"
 
 # Configuration - align with image-gallery.py options
-DELAY=5.0                 # Time in seconds between slides
+DELAY=1.5                 # Time in seconds between slides
 TRANSITION="fade"         # none, fade, or slide
-SORT="random"             # name, date, size, random
-BRIGHTNESS=0.9            # 0.1 to 1.0
-ORIENTATION="landscape"   # landscape or portrait
-SHOW_INFO=true            # true to show image info, false to hide it
+SORT="name"               # name, date, size, random
+ORIENTATION="portrait"    # landscape or portrait
+SHOW_INFO=false           # true to show image info, false to hide it
 
 # Log file for debugging
 LOG_FILE="${SCRIPT_DIR}/gallery.log"
@@ -38,7 +37,6 @@ CMD="$CMD '$IMAGE_DIR'"
 CMD="$CMD --delay $DELAY"
 CMD="$CMD --transition $TRANSITION"
 CMD="$CMD --sort $SORT"
-CMD="$CMD --brightness $BRIGHTNESS"
 CMD="$CMD --slideshow"  # Start in slideshow mode
 
 # Add options based on configuration
