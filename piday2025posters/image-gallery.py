@@ -100,8 +100,16 @@ def get_sorted_images(image_files, sort_method):
     else:
         return sorted(image_files)  # Default to name
 
-def transition_effect(display, current_image, next_image, effect='none'):
-    """Apply transition effect between images."""
+def transition_effect(display, current_image, next_image, effect='none', is_forward=True):
+    """Apply transition effect between images.
+    
+    Args:
+        display: DisplayHATMini instance
+        current_image: Current displayed image
+        next_image: Image to transition to
+        effect: Transition effect ('none', 'fade', 'slide')
+        is_forward: Direction of navigation (True for next, False for previous)
+    """
     width = DisplayHATMini.WIDTH
     height = DisplayHATMini.HEIGHT
     
@@ -122,7 +130,9 @@ def transition_effect(display, current_image, next_image, effect='none'):
             time.sleep(0.02)  # Short delay between steps
     
     elif effect == 'slide':
-        direction = SLIDE_DIRECTION  # 1 = right to left, -1 = left to right
+        # Set direction based on navigation direction and global setting
+        # For previous image (A button), reverse the direction
+        slide_direction = SLIDE_DIRECTION if is_forward else -SLIDE_DIRECTION
         
         # Apply slide transition
         for step in range(SLIDE_STEPS + 1):
@@ -132,7 +142,7 @@ def transition_effect(display, current_image, next_image, effect='none'):
             # Create a new composite image
             composite = Image.new("RGB", (width, height))
             
-            if direction > 0:  # Right to left
+            if slide_direction > 0:  # Right to left
                 # Current image slides off to the left
                 composite.paste(current_image, (-offset, 0))
                 # Next image slides in from the right
@@ -536,7 +546,8 @@ def main():
                     new_image = update_display()
                     if new_image:
                         if settings["transition"] != "none":
-                            transition_effect(display, old_image, new_image, settings["transition"])
+                            # Pass is_forward=False for previous image
+                            transition_effect(display, old_image, new_image, settings["transition"], is_forward=False)
                         else:
                             buffer.paste(new_image)
                             display.display()
@@ -552,7 +563,8 @@ def main():
                     new_image = update_display()
                     if new_image:
                         if settings["transition"] != "none":
-                            transition_effect(display, old_image, new_image, settings["transition"])
+                            # Pass is_forward=True for next image
+                            transition_effect(display, old_image, new_image, settings["transition"], is_forward=True)
                         else:
                             buffer.paste(new_image)
                             display.display()
@@ -653,7 +665,8 @@ def main():
                     new_image = update_display()
                     if new_image:
                         if settings["transition"] != "none":
-                            transition_effect(display, old_image, new_image, settings["transition"])
+                            # Slideshow always moves forward
+                            transition_effect(display, old_image, new_image, settings["transition"], is_forward=True)
                         else:
                             buffer.paste(new_image)
                             display.display()
