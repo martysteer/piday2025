@@ -94,11 +94,10 @@ def apply_glitch(img, threshold=0.9):
         return img_copy
 
 
-
-def glitch_transition(display, current_image, next_image, frames=12, threshold_start=0.95, threshold_end=0.85):
+def glitch_transition(display, current_image, next_image, frames=8, threshold_start=0.92, threshold_end=0.82):
     """
-    Perform a glitch transition between two images with improved buffer management
-    to prevent flashing of previous images.
+    Perform a direct glitch transition between two images without crossfade.
+    The transition increases glitch intensity and then directly shows the next image.
     
     Args:
         display: DisplayHATMini instance
@@ -108,28 +107,23 @@ def glitch_transition(display, current_image, next_image, frames=12, threshold_s
         threshold_start: Starting threshold (less glitchy)
         threshold_end: Ending threshold (more glitchy)
     """
-    import time
-    from PIL import Image
-    
     # Create new copies to avoid modifying originals
-    # This prevents any cross-contamination from previous transitions
     current = current_image.copy()
-    next_img = next_image.copy()
     
     # Get display dimensions
     width, height = display.buffer.size
     
     try:
-        # First phase: gradually increasing glitch on current image
-        for i in range(frames // 2):
-            # Calculate threshold
-            blend_ratio = i / (frames // 2)
+        # Phase 1: gradually increase glitch on current image
+        for i in range(frames):
+            # Calculate threshold - gradually increase glitch intensity
+            blend_ratio = i / frames
             threshold = threshold_start - (threshold_start - threshold_end) * blend_ratio
             
             # Create a fresh buffer for this frame
             frame_buffer = Image.new("RGB", (width, height), (0, 0, 0))
             
-            # Apply glitch to current image
+            # Apply glitch to current image with increasing intensity
             glitched = apply_glitch(current, threshold)
             
             # Paste the glitched image into the fresh buffer
@@ -145,50 +139,19 @@ def glitch_transition(display, current_image, next_image, frames=12, threshold_s
             del frame_buffer
             
             # Small delay between frames
-            time.sleep(0.05)
+            time.sleep(0.04)
         
-        # Get one final glitched version of the current image
-        final_glitched = apply_glitch(current, threshold_end)
-        
-        # Second phase: crossfade from glitched current image to clean next image
-        for i in range(frames // 2 + 1):
-            # Calculate alpha for crossfade
-            alpha = i / (frames // 2)
-            
-            # Create a fresh buffer for this frame
-            frame_buffer = Image.new("RGB", (width, height), (0, 0, 0))
-            
-            # Blend the images
-            blended = Image.blend(final_glitched, next_img, alpha)
-            
-            # Paste the blended image into the fresh buffer
-            frame_buffer.paste(blended)
-            
-            # Update the display with this frame
-            display.buffer.paste(frame_buffer)
-            display.display()
-            display.process_events()
-            
-            # Clean up to prevent memory leaks
-            del blended
-            del frame_buffer
-            
-            # Small delay between frames
-            time.sleep(0.05)
-        
-        # IMPORTANT: Ensure final frame is exactly the next image with no artifacts
-        # Create a fresh buffer for the final frame
+        # Phase 2: Directly show next image (no fade)
         final_buffer = Image.new("RGB", (width, height), (0, 0, 0))
-        final_buffer.paste(next_img)
+        final_buffer.paste(next_image)
         
-        # Update the display with the final image
+        # Update the display with the next image
         display.buffer.paste(final_buffer)
         display.display()
         display.process_events()
         
         # Clean up
         del final_buffer
-        del final_glitched
                 
     except Exception as e:
         print(f"Error in glitch transition: {e}")
@@ -198,7 +161,5 @@ def glitch_transition(display, current_image, next_image, frames=12, threshold_s
         display.buffer.paste(clean_buffer)
         display.display()
         display.process_events()
-
-
 
 
