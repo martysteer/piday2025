@@ -218,10 +218,10 @@ class DisplayHATMini:
         """Process pygame events for button presses"""
         # Key mapping: Use WASD or arrow keys for A,B,X,Y buttons
         key_map = {
-            pygame.K_w: self.BUTTON_A,
-            pygame.K_a: self.BUTTON_B,
-            pygame.K_s: self.BUTTON_X,
-            pygame.K_d: self.BUTTON_Y,
+            pygame.K_a: self.BUTTON_A,
+            pygame.K_b: self.BUTTON_B,
+            pygame.K_x: self.BUTTON_X,
+            pygame.K_y: self.BUTTON_Y,
             pygame.K_UP: self.BUTTON_A,
             pygame.K_LEFT: self.BUTTON_B,
             pygame.K_DOWN: self.BUTTON_X,
