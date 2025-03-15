@@ -25,22 +25,19 @@ from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 try:
-    # from displayhatmini import DisplayHATMini  ## orginal
-    from displayhatproxy import DisplayHATMini   ## proxy wrapper
+    from displayhatutils import (
+        DisplayHATMini,
+        process_image,
+        display_info_message,
+        load_image,
+        find_images,
+        overlay_info,
+        clear_display
+    )
 except ImportError:
-    print("Error: Could not import DisplayHATMini. Make sure displayhatproxy.py is in the same directory.")
+    print("Error: Could not import from displayhatutils. Make sure displayhatutils.py is in the same directory.")
     exit(1)
 
-
-# Import the shared utility functions
-from display_hat_utils import (
-    process_image, 
-    display_info_message, 
-    load_image, 
-    find_images, 
-    overlay_info, 
-    clear_display
-)
 
 # Global constants
 FADE_STEPS = 10      # Number of steps in fade transition
@@ -121,6 +118,7 @@ def transition_effect(display, current_image, next_image, effect='none'):
             blended = Image.blend(current_image, next_image, alpha)
             display.buffer.paste(blended)
             display.display()
+            display.process_events()  # Ensure display updates on all platforms
             time.sleep(0.02)  # Short delay between steps
     
     elif effect == 'slide':
@@ -144,6 +142,7 @@ def transition_effect(display, current_image, next_image, effect='none'):
                 
             display.buffer.paste(composite)
             display.display()
+            display.process_events()  # Ensure display updates on all platforms
             time.sleep(0.02)  # Short delay between steps
 
 def draw_settings_menu(display, options, selected_index, title="Settings Menu"):
@@ -191,6 +190,7 @@ def draw_settings_menu(display, options, selected_index, title="Settings Menu"):
     # Display the menu
     display.buffer.paste(menu_image)
     display.display()
+    display.process_events()  # Ensure display updates on all platforms
 
 def change_setting_value(setting_type, current_value, direction=1):
     """Change a setting value based on its type."""
@@ -318,9 +318,9 @@ def settings_menu(display, current_settings):
         if not (curr_a or curr_b or curr_x or curr_y):
             display.set_led(0.1, 0.1, 0.1)
         
-        # Update the display (does the right thing on any platform)
+        # Process events to ensure proper display updates
         display.process_events()
-
+        
         # Small delay to prevent CPU hogging
         time.sleep(0.1)
     
@@ -444,6 +444,7 @@ def main():
     if current_image is not None:
         buffer.paste(current_image)
         display.display()
+        display.process_events()  # Ensure display updates on all platforms
     
     # Show instructions
     print("\nButton controls:")
@@ -484,6 +485,7 @@ def main():
                     if new_image:
                         buffer.paste(new_image)
                         display.display()
+                        display.process_events()  # Ensure display updates on all platforms
                     
                 elif curr_b and not prev_b:
                     # Toggle orientation
@@ -494,6 +496,7 @@ def main():
                     if new_image:
                         buffer.paste(new_image)
                         display.display()
+                        display.process_events()  # Ensure display updates on all platforms
                     
                 elif curr_x and not prev_x:
                     # Rotate 90° clockwise
@@ -504,6 +507,7 @@ def main():
                     if new_image:
                         buffer.paste(new_image)
                         display.display()
+                        display.process_events()  # Ensure display updates on all platforms
                     
                 elif curr_y and not prev_y:
                     # Exit transform menu
@@ -515,6 +519,7 @@ def main():
                     if new_image:
                         buffer.paste(new_image)
                         display.display()
+                        display.process_events()  # Ensure display updates on all platforms
             
             # Normal gallery navigation mode
             else:
@@ -532,6 +537,7 @@ def main():
                         else:
                             buffer.paste(new_image)
                             display.display()
+                            display.process_events()  # Ensure display updates on all platforms
                     
                 elif curr_b and not prev_b:
                     # Next image
@@ -547,6 +553,7 @@ def main():
                         else:
                             buffer.paste(new_image)
                             display.display()
+                            display.process_events()  # Ensure display updates on all platforms
                 
                 # Check for long press on X button (Settings menu)
                 if curr_x and not x_press_time:
@@ -570,6 +577,7 @@ def main():
                     if new_image:
                         buffer.paste(new_image)
                         display.display()
+                        display.process_events()  # Ensure display updates on all platforms
                 
                 elif not curr_x and x_press_time:
                     # Short press (released before long press threshold)
@@ -590,6 +598,7 @@ def main():
                         if new_image:
                             buffer.paste(new_image)
                             display.display()
+                            display.process_events()  # Ensure display updates on all platforms
                     
                     x_press_time = 0
                     display.set_led(0.1, 0.1, 0.1)  # Reset to subtle indicator
@@ -605,6 +614,7 @@ def main():
                     if new_image:
                         buffer.paste(new_image)
                         display.display()
+                        display.process_events()  # Ensure display updates on all platforms
                 
                 # Check for long press on Y button (Transform menu)
                 if curr_y and not y_press_time:
@@ -624,6 +634,7 @@ def main():
                     if new_image:
                         buffer.paste(new_image)
                         display.display()
+                        display.process_events()  # Ensure display updates on all platforms
                     
                 elif not curr_y and y_press_time:
                     # Button released before long press threshold
@@ -643,6 +654,7 @@ def main():
                         else:
                             buffer.paste(new_image)
                             display.display()
+                            display.process_events()  # Ensure display updates on all platforms
                     
                     last_slideshow_time = time.time()
             
@@ -655,6 +667,9 @@ def main():
             # Reset LED to subtle indicator after actions (if not in a menu)
             if not in_transform_menu and not curr_x and not curr_y:
                 display.set_led(0.1, 0.1, 0.1)
+            
+            # Process events to ensure proper display updates
+            display.process_events()
             
             # Short delay to prevent CPU hogging
             time.sleep(0.1)

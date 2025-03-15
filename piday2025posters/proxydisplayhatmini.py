@@ -93,7 +93,7 @@ class DisplayHATMini:
         
         # Show help text on startup
         font = pygame.font.SysFont(None, 18)
-        help_text = font.render("Use WASD or Arrow keys to simulate buttons", True, (255, 255, 255))
+        help_text = font.render("Use AB/XY or Arrow keys to simulate buttons", True, (255, 255, 255))
         help_rect = help_text.get_rect(center=(self.WIDTH // 2, self.HEIGHT - 15))
         self.screen.blit(help_text, help_rect)
         pygame.display.flip()

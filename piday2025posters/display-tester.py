@@ -3,12 +3,10 @@ import argparse
 import time
 from PIL import Image, ImageDraw
 
-# Import DisplayHATMini from our new combined utility module
 try:
     from displayhatutils import DisplayHATMini
 except ImportError:
-    print("Error: Could not import DisplayHATMini from displayhatutils.")
-    print("Make sure displayhatutils.py is in the same directory.")
+    print("Error: Could not import from displayhatutils. Make sure displayhatutils.py is in the same directory.")
     exit(1)
 
 
