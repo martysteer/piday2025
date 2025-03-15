@@ -127,18 +127,21 @@ def transition_effect(display, current_image, next_image, effect='none'):
         # Apply slide transition
         for step in range(SLIDE_STEPS + 1):
             progress = step / SLIDE_STEPS
-            offset = int(width * (1.0 - progress))
+            offset = int(width * progress)
             
-            if direction > 0:
-                # Right to left (new image comes from right)
-                composite = Image.new("RGB", (width, height))
-                composite.paste(current_image, (-offset * direction, 0))
-                composite.paste(next_image, (width - offset * direction, 0))
-            else:
-                # Left to right (new image comes from left)
-                composite = Image.new("RGB", (width, height))
-                composite.paste(current_image, (offset * -direction, 0))
-                composite.paste(next_image, (offset * -direction - width, 0))
+            # Create a new composite image
+            composite = Image.new("RGB", (width, height))
+            
+            if direction > 0:  # Right to left
+                # Current image slides off to the left
+                composite.paste(current_image, (-offset, 0))
+                # Next image slides in from the right
+                composite.paste(next_image, (width - offset, 0))
+            else:  # Left to right
+                # Current image slides off to the right
+                composite.paste(current_image, (offset, 0))
+                # Next image slides in from the left
+                composite.paste(next_image, (offset - width, 0))
                 
             display.buffer.paste(composite)
             display.display()
