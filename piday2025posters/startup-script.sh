@@ -8,8 +8,8 @@ SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 IMAGE_DIR="${SCRIPT_DIR}/images"
 
 # Configuration - align with image-gallery.py options
-DELAY=1.5                 # Time in seconds between slides
-TRANSITION="fade"         # none, fade, or slide
+DELAY=3.0                 # Time in seconds between slides
+TRANSITION="glitch"       # none, fade, or slide
 SORT="name"               # name, date, size, random
 ORIENTATION="portrait"    # landscape or portrait
 SHOW_INFO=false           # true to show image info, false to hide it
