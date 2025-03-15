@@ -8,7 +8,7 @@ images on a Raspberry Pi with the Display HAT Mini.
 Features:
 - Browse through all images in a directory
 - Automatic slideshow mode with configurable timing
-- Image transitions (fade, slide)
+- Image transitions (fade, slide, glitch)
 - Sort images by name, date, or size
 - Transform images (rotate, flip, change orientation)
 - Display image information
@@ -37,6 +37,12 @@ try:
 except ImportError:
     print("Error: Could not import from displayhatutils. Make sure displayhatutils.py is in the same directory.")
     exit(1)
+
+try:
+    from glitch import glitch_transition
+except ImportError:
+    print("Warning: glitch.py not found. Glitch transition will not be available.")
+    glitch_transition = None
 
 
 # Global constants
@@ -77,7 +83,7 @@ def parse_arguments():
                         help='Slideshow delay in seconds (default: 5.0)')
     
     # Transition effects
-    parser.add_argument('--transition', '-t', choices=['none', 'fade', 'slide'], default='none',
+    parser.add_argument('--transition', '-t', choices=['none', 'fade', 'slide', 'glitch'], default='none',
                         help='Transition effect between images (default: none)')
     
     parser.add_argument('--sort', choices=['name', 'date', 'size', 'random'], default='name',
@@ -157,6 +163,14 @@ def transition_effect(display, current_image, next_image, effect='none', is_forw
             display.display()
             display.process_events()  # Ensure display updates on all platforms
             time.sleep(0.02)  # Short delay between steps
+    
+    elif effect == 'glitch' and glitch_transition is not None:
+        # Apply glitch transition
+        glitch_transition(display, current_image, next_image)
+    else:
+        # Fallback to no transition if requested effect not available
+        display.buffer.paste(next_image)
+        display.display()
 
 def draw_settings_menu(display, options, selected_index, title="Settings Menu"):
     """Draw the settings menu on the display."""
@@ -212,7 +226,7 @@ def change_setting_value(setting_type, current_value, direction=1):
     elif setting_type == "orientation":
         return "landscape" if current_value == "portrait" else "portrait"
     elif setting_type == "transition":
-        transitions = ["none", "fade", "slide"]
+        transitions = ["none", "fade", "slide", "glitch"]
         current_index = transitions.index(current_value)
         new_index = (current_index + direction) % len(transitions)
         return transitions[new_index]
