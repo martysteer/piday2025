@@ -8,7 +8,7 @@ images on a Raspberry Pi with the Display HAT Mini.
 Features:
 - Browse through all images in a directory
 - Automatic slideshow mode with configurable timing
-- Image transitions (fade, slide, glitch)
+- Image transitions (fade, slide, glitch, ascii)
 - Sort images by name, date, or size
 - Transform images (rotate, flip, change orientation)
 - Display image information
@@ -43,6 +43,13 @@ try:
 except ImportError:
     print("Warning: glitch.py not found. Glitch transition will not be available.")
     glitch_transition = None
+
+try:
+    from ascii import ascii_transition, ascii_transition_text_overlay
+except ImportError:
+    print("Warning: ascii.py not found. ASCII transition will not be available.")
+    ascii_transition = None
+    ascii_transition_text_overlay = None
 
 
 # Global constants
@@ -83,7 +90,7 @@ def parse_arguments():
                         help='Slideshow delay in seconds (default: 5.0)')
     
     # Transition effects
-    parser.add_argument('--transition', '-t', choices=['none', 'fade', 'slide', 'glitch'], default='none',
+    parser.add_argument('--transition', '-t', choices=['none', 'fade', 'slide', 'glitch', 'ascii'], default='none',
                         help='Transition effect between images (default: none)')
     
     parser.add_argument('--sort', choices=['name', 'date', 'size', 'random'], default='name',
@@ -113,7 +120,7 @@ def transition_effect(display, current_image, next_image, effect='none', is_forw
         display: DisplayHATMini instance
         current_image: Current displayed image
         next_image: Image to transition to
-        effect: Transition effect ('none', 'fade', 'slide')
+        effect: Transition effect ('none', 'fade', 'slide', 'glitch', 'ascii')
         is_forward: Direction of navigation (True for next, False for previous)
     """
     width = DisplayHATMini.WIDTH
@@ -167,6 +174,11 @@ def transition_effect(display, current_image, next_image, effect='none', is_forw
     elif effect == 'glitch' and glitch_transition is not None:
         # Apply glitch transition
         glitch_transition(display, current_image, next_image)
+    
+    elif effect == 'ascii' and ascii_transition is not None:
+        # Apply ASCII transition
+        # Use text overlay version for more interesting effect
+        ascii_transition_text_overlay(display, current_image, next_image)
     else:
         # Fallback to no transition if requested effect not available
         display.buffer.paste(next_image)
@@ -226,7 +238,7 @@ def change_setting_value(setting_type, current_value, direction=1):
     elif setting_type == "orientation":
         return "landscape" if current_value == "portrait" else "portrait"
     elif setting_type == "transition":
-        transitions = ["none", "fade", "slide", "glitch"]
+        transitions = ["none", "fade", "slide", "glitch", "ascii"]
         current_index = transitions.index(current_value)
         new_index = (current_index + direction) % len(transitions)
         return transitions[new_index]

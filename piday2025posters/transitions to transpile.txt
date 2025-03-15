@@ -1,0 +1,4 @@
+transitions to transpile:
+https://p5js.org/sketches/2174234/
+https://github.com/humanbydefinition/p5.asciify
+https://antiboredom.github.io/p5.riso/
