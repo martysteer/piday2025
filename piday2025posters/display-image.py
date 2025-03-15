@@ -12,7 +12,14 @@ import time
 import os
 import sys
 from PIL import Image
-from displayhatmini import DisplayHATMini
+
+try:
+    # from displayhatmini import DisplayHATMini  ## orginal
+    from displayhatproxy import DisplayHATMini   ## proxy wrapper
+except ImportError:
+    print("Error: Could not import DisplayHATMini. Make sure displayhatproxy.py is in the same directory.")
+    exit(1)
+
 
 # Import the shared utility functions
 from display_hat_utils import (
@@ -187,6 +194,9 @@ def main():
                 if not (curr_a or curr_b or curr_x or curr_y):
                     display.set_led(0.1, 0.1, 0.1)
                 
+                # Update the display (does the right thing on any platform)
+                display.process_events()
+
                 # Short delay to prevent CPU hogging
                 time.sleep(0.1)
                 

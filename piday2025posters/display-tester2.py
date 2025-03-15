@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 import argparse
 import time
-import platform
-import os
 from PIL import Image, ImageDraw
+
+try:
+    # from displayhatmini import DisplayHATMini  ## orginal
+    from displayhatproxy import DisplayHATMini   ## proxy wrapper
+except ImportError:
+    print("Error: Could not import DisplayHATMini. Make sure displayhatproxy.py is in the same directory.")
+    exit(1)
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Display a colored square on Display HAT Mini')
@@ -22,24 +28,6 @@ def hex_to_rgb(hex_color):
 
 def main():
     args = parse_arguments()
-    
-    # Import the appropriate display HAT library based on platform
-    if platform.system() == "Darwin":  # macOS
-        # Check if proxydisplayhatmini is available
-        try:
-            from proxydisplayhatmini import DisplayHATMini
-            print("Using proxy DisplayHATMini implementation for macOS")
-        except ImportError:
-            print("Error: proxydisplayhatmini.py not found in current directory.")
-            print("Please make sure the file is in the same directory as this script.")
-            return
-    else:  # Raspberry Pi or other Linux system
-        try:
-            from displayhatmini import DisplayHATMini
-        except ImportError:
-            print("Error: Display HAT Mini library not found. Please install it with:")
-            print("sudo pip3 install displayhatmini")
-            return
     
     # Parse the size argument
     try:
@@ -62,9 +50,6 @@ def main():
     # Initialize the Display HAT Mini
     display = DisplayHATMini(buffer)
     
-    # Set a subtle LED indicator
-    display.set_led(0.1, 0.1, 0.1)
-    
     # Calculate the position to center the square
     x_offset = (DisplayHATMini.WIDTH - width) // 2
     y_offset = (DisplayHATMini.HEIGHT - height) // 2
@@ -83,9 +68,7 @@ def main():
     
     try:
         while True:
-            # For macOS version, we need to regularly call display() to process events
-            if platform.system() == "Darwin":
-                display.display()
+            display.process_events()
             time.sleep(0.1)
     except KeyboardInterrupt:
         print("\nExiting...")

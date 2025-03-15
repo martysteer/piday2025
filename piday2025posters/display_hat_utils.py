@@ -8,7 +8,13 @@ import os
 import glob
 import time
 from PIL import Image, ImageDraw, ImageFont, ImageOps
-from displayhatmini import DisplayHATMini
+
+try:
+    # from displayhatmini import DisplayHATMini  ## orginal
+    from displayhatproxy import DisplayHATMini   ## proxy wrapper
+except ImportError:
+    print("Error: Could not import DisplayHATMini. Make sure displayhatproxy.py is in the same directory.")
+    exit(1)
 
 def process_image(image, is_portrait=False, rotation=0, flip_horizontal=False):
     """
