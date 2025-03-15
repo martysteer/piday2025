@@ -1,20 +1,39 @@
 #!/usr/bin/env python3
 """
 Utility module for Display HAT Mini applications.
-Contains common functions used across multiple Display HAT Mini applications.
+Contains common functions used across multiple Display HAT Mini applications
+and proxy implementation for cross-platform support.
 """
 
 import os
 import glob
 import time
+import platform
+import sys
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
-try:
-    # from displayhatmini import DisplayHATMini  ## orginal
-    from displayhatproxy import DisplayHATMini   ## proxy wrapper
-except ImportError:
-    print("Error: Could not import DisplayHATMini. Make sure displayhatproxy.py is in the same directory.")
-    exit(1)
+# First, determine which DisplayHATMini implementation to use based on platform
+if platform.system() == "Darwin":  # macOS
+    try:
+        # Import the proxy implementation
+        from proxydisplayhatmini import DisplayHATMini
+        print("Using proxy DisplayHATMini implementation for macOS")
+    except ImportError:
+        raise ImportError("Error: proxydisplayhatmini.py not found in the current directory or PYTHONPATH.")
+else:  # Raspberry Pi or other Linux system
+    try:
+        from displayhatmini import DisplayHATMini
+        print("Using actual DisplayHATMini implementation")
+    except ImportError:
+        raise ImportError("Error: Display HAT Mini library not found. Please install it with: sudo pip3 install displayhatmini")
+
+# Add platform-specific processing method to DisplayHATMini
+if platform.system() == "Darwin":
+    # For macOS proxy version
+    DisplayHATMini.process_events = lambda self: self.display()
+else:
+    # For actual hardware, no action needed
+    DisplayHATMini.process_events = lambda self: None
 
 def process_image(image, is_portrait=False, rotation=0, flip_horizontal=False):
     """

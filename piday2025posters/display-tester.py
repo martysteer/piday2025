@@ -2,7 +2,15 @@
 import argparse
 import time
 from PIL import Image, ImageDraw
-from displayhatmini import DisplayHATMini
+
+# Import DisplayHATMini from our new combined utility module
+try:
+    from displayhatutils import DisplayHATMini
+except ImportError:
+    print("Error: Could not import DisplayHATMini from displayhatutils.")
+    print("Make sure displayhatutils.py is in the same directory.")
+    exit(1)
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Display a colored square on Display HAT Mini')
@@ -61,6 +69,8 @@ def main():
     
     try:
         while True:
+            # Use the process_events method which is platform-aware
+            display.process_events()
             time.sleep(0.1)
     except KeyboardInterrupt:
         print("\nExiting...")
