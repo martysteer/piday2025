@@ -14,21 +14,18 @@ import sys
 from PIL import Image
 
 try:
-    # from displayhatmini import DisplayHATMini  ## orginal
-    from displayhatproxy import DisplayHATMini   ## proxy wrapper
+    from displayhatutils import (
+        DisplayHATMini,
+        process_image,
+        display_info_message,
+        load_image,
+        overlay_info,
+        clear_display
+    )
 except ImportError:
-    print("Error: Could not import DisplayHATMini. Make sure displayhatproxy.py is in the same directory.")
+    print("Error: Could not import from displayhatutils. Make sure displayhatutils.py is in the same directory.")
     exit(1)
-
-
-# Import the shared utility functions
-from display_hat_utils import (
-    process_image, 
-    display_info_message, 
-    load_image, 
-    overlay_info, 
-    clear_display
-)
+    
 
 def parse_arguments():
     """Parse command-line arguments."""
