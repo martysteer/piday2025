@@ -141,9 +141,23 @@ def glitch_transition(display, current_image, next_image, frames=12, threshold_s
                 display.process_events()
                 break
                 
+        # IMPORTANT: Add a final frame that's exactly the next image
+        # This ensures no artifacts remain from the transition
+        time.sleep(0.05)  # Brief pause before final frame
+        
+        # Create a clean copy of the next image
+        clean_next = next_img.copy()  
+        
+        # Explicitly clear the buffer with a complete redraw
+        display.buffer = Image.new("RGB", display.buffer.size, (0, 0, 0))
+        display.buffer.paste(clean_next)
+        display.display()
+        display.process_events()
+                
     except Exception as e:
         print(f"Error in glitch transition: {e}")
         # If anything fails, fall back to direct display of next image
+        display.buffer = Image.new("RGB", display.buffer.size, (0, 0, 0))
         display.buffer.paste(next_image)
         display.display()
         display.process_events()
