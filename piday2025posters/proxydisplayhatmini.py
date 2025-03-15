@@ -69,8 +69,9 @@ class DisplayHATMini:
         }
         self.button_callback = None
         
-        # Initialize pygame
-        pygame.init()
+        # Initialize only the pygame modules we need (avoiding audio)
+        pygame.display.init()
+        pygame.font.init()
         self.screen = pygame.display.set_mode((self.WIDTH, self.HEIGHT))
         pygame.display.set_caption("Display HAT Mini Emulator")
         
@@ -103,6 +104,8 @@ class DisplayHATMini:
     def __del__(self):
         """Clean up pygame on exit"""
         try:
+            pygame.display.quit()
+            pygame.font.quit()
             pygame.quit()
         except:
             pass
