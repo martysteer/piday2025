@@ -11,8 +11,11 @@ from PIL import Image
 
 def get_random_indices():
     """
-    Generate safer random indices for glitching, avoiding critical JPEG header bytes
+    Generate random indices for glitching, avoiding certain values
+    that might completely break the image.
     """
+    import random
+    
     # These are indices to avoid, expanded to include more critical bytes
     avoid_indices = [0, 1, 2, 3, 4, 6, 7, 8, 9, 12, 16, 17, 24, 29, 34, 
                     255, 216, 217, 218, 219, 192, 193, 194, 195]
@@ -27,6 +30,7 @@ def get_random_indices():
     # Return both indices, being more careful with the replacement value
     return index, random.randint(50, 130)
 
+
 def apply_glitch(img, threshold=0.9):
     """
     Apply glitch effect to a PIL Image with improved safety checks
@@ -39,6 +43,10 @@ def apply_glitch(img, threshold=0.9):
     Returns:
         Glitched PIL Image
     """
+    import random
+    import io
+    from PIL import Image
+    
     # Clamp threshold to a safer range
     threshold = max(0.85, min(0.995, threshold))
     
@@ -85,6 +93,8 @@ def apply_glitch(img, threshold=0.9):
         print(f"Error during glitching: {e}")
         return img_copy
 
+
+
 def glitch_transition(display, current_image, next_image, frames=12, threshold_start=0.95, threshold_end=0.85):
     """
     Perform a glitch transition between two images with improved buffer management
@@ -98,6 +108,9 @@ def glitch_transition(display, current_image, next_image, frames=12, threshold_s
         threshold_start: Starting threshold (less glitchy)
         threshold_end: Ending threshold (more glitchy)
     """
+    import time
+    from PIL import Image
+    
     # Create new copies to avoid modifying originals
     # This prevents any cross-contamination from previous transitions
     current = current_image.copy()
@@ -185,3 +198,7 @@ def glitch_transition(display, current_image, next_image, frames=12, threshold_s
         display.buffer.paste(clean_buffer)
         display.display()
         display.process_events()
+
+
+
+
