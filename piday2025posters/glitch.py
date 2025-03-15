@@ -11,31 +11,29 @@ from PIL import Image
 
 def get_random_indices():
     """
-    Generate random indices for glitching, avoiding certain values
-    that might completely break the image.
+    Generate safer random indices for glitching, avoiding critical JPEG header bytes
     """
-    # These are indices to avoid, similar to the ng array in JS
-    # Expanded to include more critical bytes
+    # These are indices to avoid, expanded to include more critical bytes
     avoid_indices = [0, 1, 2, 3, 4, 6, 7, 8, 9, 12, 16, 17, 24, 29, 34, 
                     255, 216, 217, 218, 219, 192, 193, 194, 195]
     
     # Generate random index
-    index = random.randint(20, 150)  # Reduced range to safer bytes
+    index = random.randint(50, 150)  # Reduced range to safer bytes
     
     # Regenerate if in avoid_indices
     while index in avoid_indices:
-        index = random.randint(20, 150)
+        index = random.randint(50, 150)
     
     # Return both indices, being more careful with the replacement value
-    return index, random.randint(30, 130)
+    return index, random.randint(50, 130)
 
 def apply_glitch(img, threshold=0.9):
     """
-    Apply glitch effect to a PIL Image
+    Apply glitch effect to a PIL Image with improved safety checks
     
     Args:
         img: PIL Image to glitch
-        threshold: Threshold value between 0.75 and 0.995
+        threshold: Threshold value between 0.85 and 0.995
                   Higher values = less glitching
     
     Returns:
@@ -50,7 +48,7 @@ def apply_glitch(img, threshold=0.9):
     try:
         # Convert image to JPEG bytes
         buffer = io.BytesIO()
-        img_copy.save(buffer, format="JPEG", quality=90)
+        img_copy.save(buffer, format="JPEG", quality=92)
         jpeg_bytes = buffer.getvalue()
         
         # Convert to bytearray for modification
@@ -61,17 +59,25 @@ def apply_glitch(img, threshold=0.9):
         
         # Count modifications to limit corruption
         mod_count = 0
-        max_mods = len(binary) // 50  # Limit modifications to 2% of bytes
+        max_mods = len(binary) // 200  # Limit modifications to 0.5% of bytes for safety
         
         # Apply glitch effect with limits
         for i in range(len(binary)):
+            # Skip the first 500 bytes to avoid JPEG header corruption
+            if i < 500:
+                continue
+                
             if binary[i] == replace_val and random.random() > threshold and mod_count < max_mods:
                 binary[i] = new_val
                 mod_count += 1
         
         # Convert back to image
         try:
-            return Image.open(io.BytesIO(binary))
+            glitched_img = Image.open(io.BytesIO(binary))
+            # Convert to RGB to ensure consistency
+            if glitched_img.mode != "RGB":
+                glitched_img = glitched_img.convert("RGB")
+            return glitched_img
         except Exception as e:
             print(f"Error reading glitched image: {e}")
             return img_copy
@@ -81,7 +87,8 @@ def apply_glitch(img, threshold=0.9):
 
 def glitch_transition(display, current_image, next_image, frames=12, threshold_start=0.95, threshold_end=0.85):
     """
-    Perform a glitch transition between two images
+    Perform a glitch transition between two images with improved buffer management
+    to prevent flashing of previous images.
     
     Args:
         display: DisplayHATMini instance
@@ -91,73 +98,90 @@ def glitch_transition(display, current_image, next_image, frames=12, threshold_s
         threshold_start: Starting threshold (less glitchy)
         threshold_end: Ending threshold (more glitchy)
     """
-    # Create copies to avoid modifying originals
+    # Create new copies to avoid modifying originals
+    # This prevents any cross-contamination from previous transitions
     current = current_image.copy()
     next_img = next_image.copy()
+    
+    # Get display dimensions
+    width, height = display.buffer.size
     
     try:
         # First phase: gradually increasing glitch on current image
         for i in range(frames // 2):
-            # Calculate threshold - more careful range
-            blend_ratio = i / frames
-            threshold = threshold_start - (threshold_start - threshold_end) * (2 * blend_ratio)
+            # Calculate threshold
+            blend_ratio = i / (frames // 2)
+            threshold = threshold_start - (threshold_start - threshold_end) * blend_ratio
+            
+            # Create a fresh buffer for this frame
+            frame_buffer = Image.new("RGB", (width, height), (0, 0, 0))
             
             # Apply glitch to current image
             glitched = apply_glitch(current, threshold)
             
-            # Display the glitched image
-            display.buffer.paste(glitched)
+            # Paste the glitched image into the fresh buffer
+            frame_buffer.paste(glitched)
+            
+            # Update the display with this frame
+            display.buffer.paste(frame_buffer)
             display.display()
             display.process_events()
+            
+            # Clean up to prevent memory leaks
+            del glitched
+            del frame_buffer
             
             # Small delay between frames
             time.sleep(0.05)
         
-        # Second phase: crossfade to next image without additional glitching
-        for i in range(frames // 2, frames):
+        # Get one final glitched version of the current image
+        final_glitched = apply_glitch(current, threshold_end)
+        
+        # Second phase: crossfade from glitched current image to clean next image
+        for i in range(frames // 2 + 1):
             # Calculate alpha for crossfade
-            alpha = (i - frames // 2) / (frames - frames // 2)
+            alpha = i / (frames // 2)
             
-            # Start with last glitched current image
-            if i == frames // 2:
-                glitched_current = apply_glitch(current, threshold_end)
+            # Create a fresh buffer for this frame
+            frame_buffer = Image.new("RGB", (width, height), (0, 0, 0))
             
-            # Simple blend without glitching next_img
-            try:
-                blended = Image.blend(glitched_current, next_img, alpha)
-                
-                # Display the blended image
-                display.buffer.paste(blended)
-                display.display() 
-                display.process_events()
-                
-                # Small delay between frames
-                time.sleep(0.05)
-            except Exception as e:
-                print(f"Error during blend: {e}")
-                # If blending fails, jump to next image
-                display.buffer.paste(next_img)
-                display.display()
-                display.process_events()
-                break
-                
-        # IMPORTANT: Add a final frame that's exactly the next image
-        # This ensures no artifacts remain from the transition
-        time.sleep(0.05)  # Brief pause before final frame
+            # Blend the images
+            blended = Image.blend(final_glitched, next_img, alpha)
+            
+            # Paste the blended image into the fresh buffer
+            frame_buffer.paste(blended)
+            
+            # Update the display with this frame
+            display.buffer.paste(frame_buffer)
+            display.display()
+            display.process_events()
+            
+            # Clean up to prevent memory leaks
+            del blended
+            del frame_buffer
+            
+            # Small delay between frames
+            time.sleep(0.05)
         
-        # Create a clean copy of the next image
-        clean_next = next_img.copy()  
+        # IMPORTANT: Ensure final frame is exactly the next image with no artifacts
+        # Create a fresh buffer for the final frame
+        final_buffer = Image.new("RGB", (width, height), (0, 0, 0))
+        final_buffer.paste(next_img)
         
-        # Explicitly clear the buffer with a complete redraw
-        display.buffer = Image.new("RGB", display.buffer.size, (0, 0, 0))
-        display.buffer.paste(clean_next)
+        # Update the display with the final image
+        display.buffer.paste(final_buffer)
         display.display()
         display.process_events()
+        
+        # Clean up
+        del final_buffer
+        del final_glitched
                 
     except Exception as e:
         print(f"Error in glitch transition: {e}")
         # If anything fails, fall back to direct display of next image
-        display.buffer = Image.new("RGB", display.buffer.size, (0, 0, 0))
-        display.buffer.paste(next_image)
+        clean_buffer = Image.new("RGB", (width, height), (0, 0, 0))
+        clean_buffer.paste(next_image)
+        display.buffer.paste(clean_buffer)
         display.display()
         display.process_events()
