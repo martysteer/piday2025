@@ -2,3 +2,12 @@ transitions to transpile:
 https://p5js.org/sketches/2174234/
 https://github.com/humanbydefinition/p5.asciify
 https://antiboredom.github.io/p5.riso/
+
+other ideas:
+https://feh.finalrewind.org/examples/ecraven/tagging/
+feh tagging to insert metadata in images
+use image metadata to sort jpeg files into directories as preparation step of training corpus building
+https://feh.finalrewind.org/examples/vanceza/sorting/
+
+Display exif metadata in overlay of feh image display: https://feh.finalrewind.org/examples/
+
