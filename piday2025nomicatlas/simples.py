@@ -1,36 +1,41 @@
+import argparse
 from nomic import atlas
 from PIL import Image
 from pathlib import Path
 import io
 
-# Path to image directory
-image_dir = 'data/test'  # Update to your actual path
+def main(image_dir, map_name):
+    # Get image paths
+    image_paths = list(Path(image_dir).rglob("*.[jp][pn]g"))  # jpg, jpeg, png
 
-# Get image paths
-image_paths = list(Path(image_dir).rglob("*.[jp][pn]g"))  # jpg, jpeg, png
+    blobs = []
+    data = []
 
-blobs = []
-data = []
+    for path in image_paths:
+        # Load image and convert to byte array
+        with Image.open(path) as img:
+            img_byte_arr = io.BytesIO()
+            img.save(img_byte_arr, format='PNG')
+            blobs.append(img_byte_arr.getvalue())
 
-for path in image_paths:
-    # Load image and convert to byte array
-    with Image.open(path) as img:
-        img_byte_arr = io.BytesIO()
-        img.save(img_byte_arr, format='PNG')
-        blobs.append(img_byte_arr.getvalue())
+        # Use folder name as label
+        label = path.parent.name
+        data.append({
+            "filename": path.name,
+            "label": label
+        })
 
-    # Use folder name as label (assumes structure like data/images/cat/image1.jpg)
-    label = path.parent.name
-    data.append({
-        "filename": path.name,
-        "label": label
-    })
+    # Upload to Nomic Atlas
+    atlas.map_data(
+        blobs=blobs,
+        data=data,
+        identifier=map_name
+    )
 
-# Upload to Nomic Atlas
-atlas.map_data(
-    blobs=blobs,
-    data=data,
-    identifier="Local-Image-Upload-With-Labels"
-)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Upload local images to Nomic Atlas.")
+    parser.add_argument('--imagedir', required=True, help="Path to the image directory")
+    parser.add_argument('--mapname', required=True, help="Name of the Atlas map to create")
 
-# print(data)
+    args = parser.parse_args()
+    main(args.imagedir, args.mapname)
