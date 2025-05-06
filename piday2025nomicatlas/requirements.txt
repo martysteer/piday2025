@@ -1,1 +1,4 @@
 nomic[local]>=3.4.1
+requests
+urllib3
+certifi
