@@ -21,7 +21,6 @@ def main(image_dir, map_name):
         # Use folder name as label
         label = path.parent.name
         data.append({
-            "filename": path.name,
             "label": label
         })
 
